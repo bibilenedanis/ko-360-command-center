@@ -74,3 +74,26 @@ export interface NotionSchemaProperty { name: string; type: string }
 export function extractSchemaPropertyNames(schema: { properties: Record<string, unknown> }): NotionSchemaProperty[] {
   return Object.entries(schema.properties).map(([name,value])=>({name,type:(value as {type?:string})?.type ?? "unknown"}));
 }
+
+export function transformStudentToListItem(page: RawNotionPage): import("@/types/koc360").StudentListItem {
+  const p = page.properties;
+  const rawAttentionStatus = extractFormulaString(p, "Attention Status");
+
+  const attentionStatus =
+    rawAttentionStatus === "Critical"
+      ? "Critical"
+      : rawAttentionStatus === "Attention"
+        ? "Attention"
+        : "On Track";
+
+  return {
+    id: page.id,
+    name: extractTitle(p, "Student") || "Unknown student",
+    studentId: extractRichText(p, "Student ID") || "—",
+    educationLevel: extractSelect(p, "Education Level") ?? "—",
+    status: extractSelect(p, "Status") ?? extractStatus(p, "Status") ?? "—",
+    attentionStatus,
+    attentionReason:
+      extractFormulaString(p, "Attention Reason") ?? "No active attention signals",
+  };
+}

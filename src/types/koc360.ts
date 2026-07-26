@@ -32,3 +32,15 @@ export interface QuickAction {
   label: string;
   icon: QuickActionIcon;
 }
+
+export type StudentAttentionStatus = "Critical" | "Attention" | "On Track";
+
+export interface StudentListItem {
+  id: string;
+  name: string;
+  studentId: string;
+  educationLevel: string;
+  status: string;
+  attentionStatus: StudentAttentionStatus;
+  attentionReason: string;
+}

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/icon";
 import type { AttentionItem as AttentionItemType } from "@/types/koc360";
 import { AttentionItem } from "./AttentionItem";
@@ -20,12 +21,13 @@ export function AttentionNeeded({ items, totalFlagged }: Props) {
         ))}
       </div>
       <div className="p-4 bg-surface-low text-center border-t border-outline-variant">
-        <button
-          type="button"
+        <Link
+          to="/students"
+          search={{ filter: "attention" }}
           className="text-xs font-mono font-semibold tracking-wider text-primary underline underline-offset-4 hover:opacity-70 transition-opacity"
         >
           View All {totalFlagged} Flagged Students
-        </button>
+        </Link>
       </div>
     </div>
   );
