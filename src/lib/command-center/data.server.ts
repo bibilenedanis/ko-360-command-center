@@ -7,7 +7,7 @@ import {
   attentionItems as mockAttentionItems,
 } from "@/data/mock";
 import { fetchStudents, fetchTasks, fetchAIRecommendations, type RawNotionPage } from "@/lib/notion/queries.server";
-import { buildDailyBrief, extractCheckbox, extractFormulaString, transformStudentToAttention, transformTaskToPriority } from "@/lib/notion/transformers";
+import { buildDailyBrief, extractCheckbox, extractFormulaString, extractSelect, extractStatus, transformStudentToAttention, transformTaskToPriority } from "@/lib/notion/transformers";
 import { isNotionConfigured } from "@/lib/notion/client.server";
 
 export interface CommandCenterData {
@@ -23,8 +23,20 @@ function isTodayPriority(page: RawNotionPage): boolean {
   return extractCheckbox(page.properties,"Due Today") || extractCheckbox(page.properties,"Is Overdue");
 }
 function needsAttention(page: RawNotionPage): boolean {
-  const s=extractFormulaString(page.properties,"Attention Status");
-  return s === "Critical" || s === "Attention";
+  const status = extractFormulaString(page.properties, "Attention Status");
+  const studentStatus =
+    extractSelect(page.properties, "Status") ??
+    extractStatus(page.properties, "Status");
+
+  return studentStatus === "Active" && (status === "Critical" || status === "Attention");
+}
+
+function attentionRank(page: RawNotionPage): number {
+  const status = extractFormulaString(page.properties, "Attention Status");
+
+  if (status === "Critical") return 0;
+  if (status === "Attention") return 1;
+  return 2;
 }
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
@@ -36,7 +48,9 @@ export async function getCommandCenterData(): Promise<CommandCenterData> {
     return fallbackData(failures.join(" | "));
   }
 
-  const attentionPages=studentsResult.data.filter(needsAttention);
+  const attentionPages=studentsResult.data
+    .filter(needsAttention)
+    .sort((a, b) => attentionRank(a) - attentionRank(b));
   const priorityPages=tasksResult.data.filter(isTodayPriority);
   return {
     dailyBrief: buildDailyBrief(aiResult.data,studentsResult.data,tasksResult.data),
