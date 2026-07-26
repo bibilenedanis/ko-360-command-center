@@ -1,24 +1,51 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { AppShell } from "@/components/app-shell/AppShell";
+import { DailyBrief } from "@/components/command-center/DailyBrief";
+import { TodaysPriorities } from "@/components/command-center/TodaysPriorities";
+import { AttentionNeeded } from "@/components/command-center/AttentionNeeded";
+import { QuickSupport } from "@/components/command-center/QuickSupport";
+import { FloatingActionButton } from "@/components/command-center/FloatingActionButton";
+import {
+  attentionItems,
+  dailyBrief,
+  flaggedStudentsCount,
+  quickActions,
+  todaysPriorities,
+} from "@/data/mock";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
-  component: Index,
+  head: () => ({
+    meta: [
+      { title: "Koç360 — Command Center" },
+      {
+        name: "description",
+        content:
+          "Daily coaching command center. AI briefing, today's priorities, and students needing attention.",
+      },
+      { property: "og:title", content: "Koç360 — Command Center" },
+      {
+        property: "og:description",
+        content: "Daily coaching command center for Koç360 coaches.",
+      },
+    ],
+  }),
+  component: CommandCenter,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+function CommandCenter() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <AppShell>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section className="lg:col-span-8 space-y-6">
+          <DailyBrief brief={dailyBrief} />
+          <TodaysPriorities items={todaysPriorities} />
+        </section>
+        <aside className="lg:col-span-4 space-y-6">
+          <AttentionNeeded items={attentionItems} totalFlagged={flaggedStudentsCount} />
+          <QuickSupport actions={quickActions} />
+        </aside>
+      </div>
+      <FloatingActionButton />
+    </AppShell>
   );
 }
