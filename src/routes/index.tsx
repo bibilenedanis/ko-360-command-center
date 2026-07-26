@@ -1,17 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { DailyBrief } from "@/components/command-center/DailyBrief";
 import { TodaysPriorities } from "@/components/command-center/TodaysPriorities";
 import { AttentionNeeded } from "@/components/command-center/AttentionNeeded";
 import { QuickSupport } from "@/components/command-center/QuickSupport";
 import { FloatingActionButton } from "@/components/command-center/FloatingActionButton";
-import {
-  attentionItems,
-  dailyBrief,
-  flaggedStudentsCount,
-  quickActions,
-  todaysPriorities,
-} from "@/data/mock";
+import { getCommandCenterData, type CommandCenterData } from "@/lib/command-center/data.server";
+
+const loadCommandCenterData = createServerFn({ method: "GET" }).handler(async () => {
+  return await getCommandCenterData();
+});
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,20 +28,25 @@ export const Route = createFileRoute("/")({
       },
     ],
   }),
+  loader: async () => {
+    return await loadCommandCenterData();
+  },
   component: CommandCenter,
 });
 
 function CommandCenter() {
+  const data = Route.useLoaderData() as CommandCenterData;
+
   return (
     <AppShell>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <section className="lg:col-span-8 space-y-6">
-          <DailyBrief brief={dailyBrief} />
-          <TodaysPriorities items={todaysPriorities} />
+          <DailyBrief brief={data.dailyBrief} />
+          <TodaysPriorities items={data.todaysPriorities} />
         </section>
         <aside className="lg:col-span-4 space-y-6">
-          <AttentionNeeded items={attentionItems} totalFlagged={flaggedStudentsCount} />
-          <QuickSupport actions={quickActions} />
+          <AttentionNeeded items={data.attentionItems} totalFlagged={data.flaggedStudentsCount} />
+          <QuickSupport actions={data.quickActions} />
         </aside>
       </div>
       <FloatingActionButton />
