@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as NotionDebugRouteImport } from './routes/notion-debug'
 import { Route as NotionHealthRouteImport } from './routes/notion-health'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ScheduleRouteImport } from './routes/schedule'
@@ -18,6 +19,11 @@ import { Route as StudentsRouteImport } from './routes/students'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotionDebugRoute = NotionDebugRouteImport.update({
+  id: '/notion-debug',
+  path: '/notion-debug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotionHealthRoute = NotionHealthRouteImport.update({
@@ -43,6 +49,7 @@ const StudentsRoute = StudentsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/notion-debug': typeof NotionDebugRoute
   '/notion-health': typeof NotionHealthRoute
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/notion-debug': typeof NotionDebugRoute
   '/notion-health': typeof NotionHealthRoute
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/notion-debug': typeof NotionDebugRoute
   '/notion-health': typeof NotionHealthRoute
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
@@ -65,12 +74,25 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/notion-health' | '/resources' | '/schedule' | '/students'
+  fullPaths:
+    | '/'
+    | '/notion-debug'
+    | '/notion-health'
+    | '/resources'
+    | '/schedule'
+    | '/students'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/notion-health' | '/resources' | '/schedule' | '/students'
+  to:
+    | '/'
+    | '/notion-debug'
+    | '/notion-health'
+    | '/resources'
+    | '/schedule'
+    | '/students'
   id:
     | '__root__'
     | '/'
+    | '/notion-debug'
     | '/notion-health'
     | '/resources'
     | '/schedule'
@@ -79,6 +101,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  NotionDebugRoute: typeof NotionDebugRoute
   NotionHealthRoute: typeof NotionHealthRoute
   ResourcesRoute: typeof ResourcesRoute
   ScheduleRoute: typeof ScheduleRoute
@@ -92,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notion-debug': {
+      id: '/notion-debug'
+      path: '/notion-debug'
+      fullPath: '/notion-debug'
+      preLoaderRoute: typeof NotionDebugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notion-health': {
@@ -127,6 +157,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  NotionDebugRoute: NotionDebugRoute,
   NotionHealthRoute: NotionHealthRoute,
   ResourcesRoute: ResourcesRoute,
   ScheduleRoute: ScheduleRoute,
