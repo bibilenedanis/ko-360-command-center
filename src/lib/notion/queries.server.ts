@@ -1,7 +1,4 @@
-import type {
-  QueryDatabaseResponse,
-  GetDatabaseResponse,
-} from "@notionhq/client/build/src/api-endpoints";
+import type { GetDatabaseResponse } from "@notionhq/client/build/src/api-endpoints";
 import { createNotionClient, isNotionClientError, APIResponseError } from "./client.server";
 import { getNotionConfig } from "./config.server";
 
@@ -11,14 +8,8 @@ export interface NotionQueryError {
   message: string;
   status?: number;
 }
-
-export interface NotionQuerySuccess<T> {
-  ok: true;
-  data: T;
-}
-
+export interface NotionQuerySuccess<T> { ok: true; data: T }
 export type NotionQueryOutcome<T> = NotionQuerySuccess<T> | NotionQueryError;
-
 export interface RawNotionPage {
   id: string;
   properties: Record<string, unknown>;
@@ -28,113 +19,70 @@ export interface RawNotionPage {
 }
 
 const MAX_PAGE_SIZE = 100;
-
-function toRawPages(response: QueryDatabaseResponse): RawNotionPage[] {
-  return response.results
-    .filter((page): page is Extract<typeof page, { object: "page" }> => page.object === "page")
-    .map((page) => ({
-      id: page.id,
-      properties: page.properties as Record<string, unknown>,
-      url: "url" in page ? page.url : undefined,
-      createdTime: "created_time" in page ? page.created_time : undefined,
-      lastEditedTime: "last_edited_time" in page ? page.last_edited_time : undefined,
-    }));
-}
+const dataSourceCache = new Map<string, string>();
 
 function logNotionError(operation: string, error: unknown): NotionQueryError {
   if (isNotionClientError(error) && error instanceof APIResponseError) {
     console.error(`[notion] ${operation} API error: status=${error.status} code=${error.code}`);
-    return {
-      ok: false,
-      reason: "api_error",
-      message: `Notion API rejected ${operation}: ${error.code}`,
-      status: error.status,
-    };
+    return { ok: false, reason: "api_error", message: `Notion API rejected ${operation}: ${error.code}`, status: error.status };
   }
   console.error(`[notion] ${operation} failed:`, error);
-  return {
-    ok: false,
-    reason: "api_error",
-    message: `Unexpected error during ${operation}.`,
-  };
+  return { ok: false, reason: "api_error", message: `Unexpected error during ${operation}.` };
 }
 
-export async function fetchTasks(): Promise<NotionQueryOutcome<RawNotionPage[]>> {
+async function resolveDataSourceId(databaseId: string): Promise<string> {
+  const cached = dataSourceCache.get(databaseId);
+  if (cached) return cached;
   const clientResult = createNotionClient();
-  if (!clientResult.ok) {
-    return {
-      ok: false,
-      reason: "not_configured",
-      message: clientResult.message,
-    };
-  }
+  if (!clientResult.ok) throw new Error(clientResult.message);
+  const database = await clientResult.client.databases.retrieve({ database_id: databaseId });
+  const dataSources = "data_sources" in database ? database.data_sources : [];
+  const dataSourceId = dataSources?.[0]?.id;
+  if (!dataSourceId) throw new Error(`No data source found for Notion database ${databaseId}.`);
+  dataSourceCache.set(databaseId, dataSourceId);
+  return dataSourceId;
+}
 
-  const config = getNotionConfig();
-  if (!config.tasksDatabaseId) {
-    return {
-      ok: false,
-      reason: "not_configured",
-      message: "NOTION_TASKS_DATABASE_ID is not set.",
-    };
-  }
-
+export async function fetchDatabasePages(databaseId: string | undefined, label: string): Promise<NotionQueryOutcome<RawNotionPage[]>> {
+  if (!databaseId) return { ok: false, reason: "not_configured", message: `${label} database ID is not set.` };
+  const clientResult = createNotionClient();
+  if (!clientResult.ok) return { ok: false, reason: "not_configured", message: clientResult.message };
   try {
-    const response = await clientResult.client.databases.query({
-      database_id: config.tasksDatabaseId,
-      page_size: MAX_PAGE_SIZE,
-    });
-    const pages = toRawPages(response);
-    if (pages.length === 0) {
-      return { ok: false, reason: "empty", message: "Tasks database returned no pages." };
-    }
+    const dataSourceId = await resolveDataSourceId(databaseId);
+    const pages: RawNotionPage[] = [];
+    let cursor: string | undefined;
+    do {
+      const response = await clientResult.client.dataSources.query({
+        data_source_id: dataSourceId,
+        page_size: MAX_PAGE_SIZE,
+        ...(cursor ? { start_cursor: cursor } : {}),
+      });
+      for (const result of response.results) {
+        if (result.object !== "page" || !("properties" in result)) continue;
+        pages.push({
+          id: result.id,
+          properties: result.properties as Record<string, unknown>,
+          url: "url" in result ? result.url : undefined,
+          createdTime: "created_time" in result ? result.created_time : undefined,
+          lastEditedTime: "last_edited_time" in result ? result.last_edited_time : undefined,
+        });
+      }
+      cursor = response.has_more ? response.next_cursor ?? undefined : undefined;
+    } while (cursor);
+    if (pages.length === 0) return { ok: false, reason: "empty", message: `${label} database returned no pages.` };
     return { ok: true, data: pages };
   } catch (error) {
-    return logNotionError("fetchTasks", error);
+    return logNotionError(`fetch${label}`, error);
   }
 }
 
-export async function fetchAIRecommendations(): Promise<NotionQueryOutcome<RawNotionPage[]>> {
+export function fetchStudents() { return fetchDatabasePages(getNotionConfig().studentsDatabaseId, "Students"); }
+export function fetchTasks() { return fetchDatabasePages(getNotionConfig().tasksDatabaseId, "Tasks"); }
+export function fetchAIRecommendations() { return fetchDatabasePages(getNotionConfig().aiRecommendationsDatabaseId, "AIRecommendations"); }
+
+export async function fetchDatabaseSchema(databaseId: string): Promise<NotionQueryOutcome<GetDatabaseResponse>> {
   const clientResult = createNotionClient();
-  if (!clientResult.ok) {
-    return {
-      ok: false,
-      reason: "not_configured",
-      message: clientResult.message,
-    };
-  }
-
-  const config = getNotionConfig();
-  if (!config.aiRecommendationsDatabaseId) {
-    return {
-      ok: false,
-      reason: "not_configured",
-      message: "NOTION_AI_RECOMMENDATIONS_DATABASE_ID is not set.",
-    };
-  }
-
-  try {
-    const response = await clientResult.client.databases.query({
-      database_id: config.aiRecommendationsDatabaseId,
-      page_size: MAX_PAGE_SIZE,
-    });
-    const pages = toRawPages(response);
-    if (pages.length === 0) {
-      return { ok: false, reason: "empty", message: "AI recommendations database returned no pages." };
-    }
-    return { ok: true, data: pages };
-  } catch (error) {
-    return logNotionError("fetchAIRecommendations", error);
-  }
-}
-
-export async function fetchDatabaseSchema(
-  databaseId: string,
-): Promise<NotionQueryOutcome<GetDatabaseResponse>> {
-  const clientResult = createNotionClient();
-  if (!clientResult.ok) {
-    return { ok: false, reason: "not_configured", message: clientResult.message };
-  }
-
+  if (!clientResult.ok) return { ok: false, reason: "not_configured", message: clientResult.message };
   try {
     const schema = await clientResult.client.databases.retrieve({ database_id: databaseId });
     return { ok: true, data: schema };

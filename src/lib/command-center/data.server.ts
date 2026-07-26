@@ -1,17 +1,13 @@
-import type {
-  AttentionItem,
-  DailyBrief,
-  PriorityItem,
-  QuickAction,
-} from "@/types/koc360";
-import { quickActions as mockQuickActions, flaggedStudentsCount as mockFlaggedStudentsCount } from "@/data/mock";
-import { fetchTasks, fetchAIRecommendations, type RawNotionPage } from "@/lib/notion/queries.server";
+import type { AttentionItem, DailyBrief, PriorityItem, QuickAction } from "@/types/koc360";
 import {
-  transformTaskToPriority,
-  transformTaskToAttention,
-  transformAIRecommendationToDailyBrief,
-} from "@/lib/notion/transformers";
-import { testNotionConnection } from "@/lib/notion/connection.server";
+  quickActions as mockQuickActions,
+  flaggedStudentsCount as mockFlaggedStudentsCount,
+  dailyBrief as mockDailyBrief,
+  todaysPriorities as mockTodaysPriorities,
+  attentionItems as mockAttentionItems,
+} from "@/data/mock";
+import { fetchStudents, fetchTasks, fetchAIRecommendations, type RawNotionPage } from "@/lib/notion/queries.server";
+import { buildDailyBrief, extractCheckbox, extractFormulaString, transformStudentToAttention, transformTaskToPriority } from "@/lib/notion/transformers";
 import { isNotionConfigured } from "@/lib/notion/client.server";
 
 export interface CommandCenterData {
@@ -23,97 +19,36 @@ export interface CommandCenterData {
   source: "notion" | "fallback";
 }
 
-import {
-  dailyBrief as mockDailyBrief,
-  todaysPriorities as mockTodaysPriorities,
-  attentionItems as mockAttentionItems,
-} from "@/data/mock";
-
-function isPriorityTask(page: RawNotionPage): boolean {
-  const props = page.properties as Record<string, unknown>;
-  const statusField = Object.keys(props).find((k) => /status|durum/i.test(k));
-  if (!statusField) return true;
-  const raw = props[statusField] as { status?: { name?: string } } | undefined;
-  const statusName = raw?.status?.name?.toLowerCase() ?? "";
-  return !["done", "completed", "tamam", "kapali", "kapalı"].includes(statusName);
+function isTodayPriority(page: RawNotionPage): boolean {
+  return extractCheckbox(page.properties,"Due Today") || extractCheckbox(page.properties,"Is Overdue");
 }
-
-function isAttentionTask(page: RawNotionPage): boolean {
-  const props = page.properties as Record<string, unknown>;
-  const studentField = Object.keys(props).find((k) => /student|öğrenci|name|isim|ad/i.test(k));
-  return Boolean(studentField);
+function needsAttention(page: RawNotionPage): boolean {
+  const s=extractFormulaString(page.properties,"Attention Status");
+  return s === "Critical" || s === "Attention";
 }
 
 export async function getCommandCenterData(): Promise<CommandCenterData> {
-  if (!isNotionConfigured()) {
-    console.warn("Notion unavailable — using mock fallback (NOTION_TOKEN missing)");
-    return fallbackData();
+  if (!isNotionConfigured()) return fallbackData("NOTION_TOKEN missing");
+
+  const [studentsResult,tasksResult,aiResult]=await Promise.all([fetchStudents(),fetchTasks(),fetchAIRecommendations()]);
+  if (!studentsResult.ok || !tasksResult.ok || !aiResult.ok) {
+    const failures=[studentsResult,tasksResult,aiResult].filter(r=>!r.ok).map(r=>!r.ok ? r.message : "");
+    return fallbackData(failures.join(" | "));
   }
 
-  const connection = await testNotionConnection();
-  const tasksOk = connection.tasksDatabase === "connected";
-  const aiRecsOk = connection.aiRecommendationsDatabase === "connected";
-
-  if (!tasksOk && !aiRecsOk) {
-    console.warn("Notion unavailable — using mock fallback (both databases unreachable)");
-    return fallbackData();
-  }
-
-  const [tasksResult, aiRecsResult] = await Promise.all([
-    tasksOk ? fetchTasks() : Promise.resolve({ ok: false as const, reason: "not_configured" as const, message: "tasks database unreachable" }),
-    aiRecsOk ? fetchAIRecommendations() : Promise.resolve({ ok: false as const, reason: "not_configured" as const, message: "ai recommendations database unreachable" }),
-  ]);
-
-  let dailyBrief: DailyBrief = mockDailyBrief;
-  let todaysPriorities: PriorityItem[] = [];
-  let attentionItems: AttentionItem[] = [];
-
-  if (aiRecsResult.ok) {
-    const first = aiRecsResult.data[0];
-    if (first) {
-      dailyBrief = transformAIRecommendationToDailyBrief(first);
-    } else {
-      console.warn("Notion: AI recommendations empty — using mock dailyBrief");
-    }
-  } else if (aiRecsResult.reason !== "not_configured") {
-    console.warn(`Notion: AI recommendations query failed (${aiRecsResult.reason}) — using mock dailyBrief`);
-  }
-
-  if (tasksResult.ok) {
-    const priorityPages = tasksResult.data.filter(isPriorityTask);
-    const attentionPages = tasksResult.data.filter(isAttentionTask);
-    todaysPriorities = priorityPages.map((p) => transformTaskToPriority(p));
-    attentionItems = attentionPages.map((p) => transformTaskToAttention(p));
-    if (todaysPriorities.length === 0) {
-      console.warn("Notion: no priority tasks derived — todaysPriorities empty");
-    }
-    if (attentionItems.length === 0) {
-      console.warn("Notion: no attention items derived — attentionItems empty");
-    }
-  } else if (tasksResult.reason !== "not_configured") {
-    console.warn(`Notion: tasks query failed (${tasksResult.reason}) — using mock fallback`);
-    return fallbackData();
-  }
-
-  const flaggedStudentsCount = attentionItems.length > 0 ? attentionItems.length : mockFlaggedStudentsCount;
-
+  const attentionPages=studentsResult.data.filter(needsAttention);
+  const priorityPages=tasksResult.data.filter(isTodayPriority);
   return {
-    dailyBrief,
-    todaysPriorities,
-    attentionItems,
-    flaggedStudentsCount,
+    dailyBrief: buildDailyBrief(aiResult.data,studentsResult.data,tasksResult.data),
+    todaysPriorities: priorityPages.map(transformTaskToPriority),
+    attentionItems: attentionPages.slice(0,6).map(transformStudentToAttention),
+    flaggedStudentsCount: attentionPages.length,
     quickActions: mockQuickActions,
     source: "notion",
   };
 }
 
-function fallbackData(): CommandCenterData {
-  return {
-    dailyBrief: mockDailyBrief,
-    todaysPriorities: mockTodaysPriorities,
-    attentionItems: mockAttentionItems,
-    flaggedStudentsCount: mockFlaggedStudentsCount,
-    quickActions: mockQuickActions,
-    source: "fallback",
-  };
+function fallbackData(reason: string): CommandCenterData {
+  console.warn(`Notion unavailable — using mock fallback (${reason})`);
+  return { dailyBrief: mockDailyBrief, todaysPriorities: mockTodaysPriorities, attentionItems: mockAttentionItems, flaggedStudentsCount: mockFlaggedStudentsCount, quickActions: mockQuickActions, source: "fallback" };
 }

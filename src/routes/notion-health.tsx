@@ -38,6 +38,10 @@ function NotionHealthPage() {
             </span>
           </div>
           <div className="flex justify-between">
+            <span className="text-secondary">studentsDatabase</span>
+            <span className={statusColor(report.studentsDatabase)}>{report.studentsDatabase}</span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-secondary">tasksDatabase</span>
             <span className={statusColor(report.tasksDatabase)}>{report.tasksDatabase}</span>
           </div>
