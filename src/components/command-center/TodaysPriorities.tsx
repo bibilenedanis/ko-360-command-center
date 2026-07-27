@@ -10,9 +10,9 @@ export function TodaysPriorities({ items }: Props) {
   return (
     <section className="space-y-4">
       <div className="flex justify-between items-end border-b border-outline-variant pb-2">
-        <h2 className="text-xl font-semibold text-primary">Today's Priorities</h2>
+        <h2 className="text-xl font-semibold text-primary">Bugünün Öncelikleri</h2>
         <span className="text-xs font-mono font-semibold tracking-wider text-secondary opacity-60">
-          {pending} PENDING
+          {pending} BEKLİYOR
         </span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

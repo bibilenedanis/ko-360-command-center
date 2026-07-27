@@ -5,15 +5,18 @@ import { PlaceholderPage } from "@/components/app-shell/PlaceholderPage";
 export const Route = createFileRoute("/resources")({
   head: () => ({
     meta: [
-      { title: "Resources — Koç360" },
-      { name: "description", content: "Coaching resources library." },
-      { property: "og:title", content: "Resources — Koç360" },
-      { property: "og:description", content: "Coaching resources library." },
+      { title: "Kaynaklar — Koç360" },
+      { name: "description", content: "Koçluk kaynakları kütüphanesi." },
+      { property: "og:title", content: "Kaynaklar — Koç360" },
+      { property: "og:description", content: "Koçluk kaynakları kütüphanesi." },
     ],
   }),
   component: () => (
     <AppShell>
-      <PlaceholderPage title="Resources" description="Reference materials and templates will appear here." />
+      <PlaceholderPage
+        title="Kaynaklar"
+        description="Referans materyalleri ve şablonlar burada yer alacak."
+      />
     </AppShell>
   ),
 });

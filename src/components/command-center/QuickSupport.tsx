@@ -9,7 +9,7 @@ export function QuickSupport({ actions }: Props) {
   return (
     <section className="space-y-4">
       <h3 className="text-xs font-mono font-semibold uppercase tracking-widest text-secondary opacity-60 px-1">
-        Quick Support
+        Hızlı Destek
       </h3>
       <div className="space-y-2">
         {actions.map((action) => (

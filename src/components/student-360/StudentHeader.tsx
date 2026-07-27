@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { localizeStatus } from "@/lib/ui/labels";
 
 type AttentionStatus = "Critical" | "Attention" | "On Track" | string | null;
 
@@ -36,7 +37,7 @@ export function StudentHeader({
         className="mb-3 inline-flex items-center gap-1 text-[11px] font-mono font-semibold uppercase tracking-wider text-on-surface-variant transition-opacity hover:opacity-70"
       >
         <Icon name="arrow_back" className="text-[14px]" />
-        Students
+        Öğrenciler
       </Link>
 
       <div className="flex flex-col gap-4 border border-outline-variant bg-surface-lowest p-6 sm:flex-row sm:items-center sm:justify-between">
@@ -52,7 +53,7 @@ export function StudentHeader({
               </h1>
               {status && (
                 <span className="bg-primary px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-on-primary">
-                  {status}
+                  {localizeStatus(status) || status}
                 </span>
               )}
               {attentionStatus && emphasis !== "neutral" && (
@@ -64,7 +65,7 @@ export function StudentHeader({
                       : "border-outline-variant bg-surface-high text-on-surface",
                   )}
                 >
-                  {attentionStatus}
+                  {localizeStatus(attentionStatus)}
                 </span>
               )}
             </div>

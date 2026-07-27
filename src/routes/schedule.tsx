@@ -5,15 +5,18 @@ import { PlaceholderPage } from "@/components/app-shell/PlaceholderPage";
 export const Route = createFileRoute("/schedule")({
   head: () => ({
     meta: [
-      { title: "Schedule — Koç360" },
-      { name: "description", content: "Your coaching schedule in Koç360." },
-      { property: "og:title", content: "Schedule — Koç360" },
-      { property: "og:description", content: "Your coaching schedule in Koç360." },
+      { title: "Takvim — Koç360" },
+      { name: "description", content: "Koç360 koçluk takviminiz." },
+      { property: "og:title", content: "Takvim — Koç360" },
+      { property: "og:description", content: "Koç360 koçluk takviminiz." },
     ],
   }),
   component: () => (
     <AppShell>
-      <PlaceholderPage title="Schedule" description="Sessions, deadlines, and calendar view coming soon." />
+      <PlaceholderPage
+        title="Takvim"
+        description="Görüşmeler, son tarihler ve takvim görünümü yakında."
+      />
     </AppShell>
   ),
 });
