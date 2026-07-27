@@ -9,38 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as NotionDebugRouteImport } from './routes/notion-debug'
-import { Route as NotionHealthRouteImport } from './routes/notion-health'
-import { Route as NotionSchemaRouteImport } from './routes/notion-schema'
-import { Route as ResourcesRouteImport } from './routes/resources'
-import { Route as ScheduleRouteImport } from './routes/schedule'
 import { Route as StudentsRouteImport } from './routes/students'
+import { Route as ScheduleRouteImport } from './routes/schedule'
+import { Route as ResourcesRouteImport } from './routes/resources'
+import { Route as NotionSchemaRouteImport } from './routes/notion-schema'
+import { Route as NotionHealthRouteImport } from './routes/notion-health'
+import { Route as NotionDebugRouteImport } from './routes/notion-debug'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as StudentsStudentIdRouteImport } from './routes/students_.$studentId'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotionDebugRoute = NotionDebugRouteImport.update({
-  id: '/notion-debug',
-  path: '/notion-debug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotionHealthRoute = NotionHealthRouteImport.update({
-  id: '/notion-health',
-  path: '/notion-health',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const NotionSchemaRoute = NotionSchemaRouteImport.update({
-  id: '/notion-schema',
-  path: '/notion-schema',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResourcesRoute = ResourcesRouteImport.update({
-  id: '/resources',
-  path: '/resources',
+const StudentsRoute = StudentsRouteImport.update({
+  id: '/students',
+  path: '/students',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScheduleRoute = ScheduleRouteImport.update({
@@ -48,9 +28,29 @@ const ScheduleRoute = ScheduleRouteImport.update({
   path: '/schedule',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StudentsRoute = StudentsRouteImport.update({
-  id: '/students',
-  path: '/students',
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotionSchemaRoute = NotionSchemaRouteImport.update({
+  id: '/notion-schema',
+  path: '/notion-schema',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotionHealthRoute = NotionHealthRouteImport.update({
+  id: '/notion-health',
+  path: '/notion-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotionDebugRoute = NotionDebugRouteImport.update({
+  id: '/notion-debug',
+  path: '/notion-debug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudentsStudentIdRoute = StudentsStudentIdRouteImport.update({
@@ -136,39 +136,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notion-debug': {
-      id: '/notion-debug'
-      path: '/notion-debug'
-      fullPath: '/notion-debug'
-      preLoaderRoute: typeof NotionDebugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notion-health': {
-      id: '/notion-health'
-      path: '/notion-health'
-      fullPath: '/notion-health'
-      preLoaderRoute: typeof NotionHealthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/notion-schema': {
-      id: '/notion-schema'
-      path: '/notion-schema'
-      fullPath: '/notion-schema'
-      preLoaderRoute: typeof NotionSchemaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/resources': {
-      id: '/resources'
-      path: '/resources'
-      fullPath: '/resources'
-      preLoaderRoute: typeof ResourcesRouteImport
+    '/students': {
+      id: '/students'
+      path: '/students'
+      fullPath: '/students'
+      preLoaderRoute: typeof StudentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/schedule': {
@@ -178,11 +150,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScheduleRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/students': {
-      id: '/students'
-      path: '/students'
-      fullPath: '/students'
-      preLoaderRoute: typeof StudentsRouteImport
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notion-schema': {
+      id: '/notion-schema'
+      path: '/notion-schema'
+      fullPath: '/notion-schema'
+      preLoaderRoute: typeof NotionSchemaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notion-health': {
+      id: '/notion-health'
+      path: '/notion-health'
+      fullPath: '/notion-health'
+      preLoaderRoute: typeof NotionHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notion-debug': {
+      id: '/notion-debug'
+      path: '/notion-debug'
+      fullPath: '/notion-debug'
+      preLoaderRoute: typeof NotionDebugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/students_/$studentId': {
