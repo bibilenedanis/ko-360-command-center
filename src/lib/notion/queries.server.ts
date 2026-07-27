@@ -90,3 +90,19 @@ export async function fetchDatabaseSchema(databaseId: string): Promise<NotionQue
     return logNotionError("fetchDatabaseSchema", error);
   }
 }
+
+export function fetchGoals() {
+  return fetchDatabasePages(getNotionConfig().goalsDatabaseId, "Goals");
+}
+
+export function fetchSprints() {
+  return fetchDatabasePages(getNotionConfig().sprintsDatabaseId, "Sprints");
+}
+
+export function fetchSessions() {
+  return fetchDatabasePages(getNotionConfig().sessionsDatabaseId, "Sessions");
+}
+
+export function fetchAssessments() {
+  return fetchDatabasePages(getNotionConfig().assessmentsDatabaseId, "Assessments");
+}

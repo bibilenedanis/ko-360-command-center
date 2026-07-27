@@ -46,6 +46,22 @@ function NotionHealthPage() {
             <span className={statusColor(report.tasksDatabase)}>{report.tasksDatabase}</span>
           </div>
           <div className="flex justify-between">
+            <span className="text-secondary">goalsDatabase</span>
+            <span className={statusColor(report.goalsDatabase)}>{report.goalsDatabase}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-secondary">sprintsDatabase</span>
+            <span className={statusColor(report.sprintsDatabase)}>{report.sprintsDatabase}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-secondary">sessionsDatabase</span>
+            <span className={statusColor(report.sessionsDatabase)}>{report.sessionsDatabase}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-secondary">assessmentsDatabase</span>
+            <span className={statusColor(report.assessmentsDatabase)}>{report.assessmentsDatabase}</span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-secondary">aiRecommendationsDatabase</span>
             <span className={statusColor(report.aiRecommendationsDatabase)}>
               {report.aiRecommendationsDatabase}
