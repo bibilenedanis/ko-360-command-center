@@ -26,7 +26,7 @@ export interface StudentProfileRecord {
   status: string | null;
   date: string | null;
   detail: string | null;
-  progress: number | null;
+  progress?: number | null;
 }
 
 export interface StudentProfileData {
@@ -131,7 +131,7 @@ export async function getStudentProfileData(
       status: extractSelect(page.properties, "Status"),
       date: extractDate(page.properties, "End Date"),
       detail: extractRichText(page.properties, "Focus") || null,
-      progress: null,
+      progress: extractNumber(page.properties, "Progress %"),
     })),
 
     sessions: sessions.map((page) => ({
@@ -140,7 +140,6 @@ export async function getStudentProfileData(
       status: extractSelect(page.properties, "Status"),
       date: extractDate(page.properties, "Session Date"),
       detail: extractSelect(page.properties, "Session Type"),
-      progress: null,
     })),
 
     assessments: assessments.map((page) => {
@@ -158,7 +157,6 @@ export async function getStudentProfileData(
           score !== null && maximumScore !== null
             ? `${score}/${maximumScore}`
             : extractRichText(page.properties, "Result") || null,
-        progress: null,
       };
     }),
 
@@ -170,7 +168,6 @@ export async function getStudentProfileData(
         extractStatus(page.properties, "Status"),
       date: extractDate(page.properties, "Due Date"),
       detail: extractSelect(page.properties, "Task Type"),
-      progress: null,
     })),
 
     aiRecommendations: aiRecommendations.map((page) => ({
@@ -181,7 +178,6 @@ export async function getStudentProfileData(
       status: extractSelect(page.properties, "Review Status"),
       date: extractDate(page.properties, "Generated At"),
       detail: extractSelect(page.properties, "Risk"),
-      progress: null,
     })),
 
     summary: {
