@@ -3,6 +3,12 @@ import { cn } from "@/lib/utils";
 
 type AttentionStatus = "Critical" | "Attention" | "On Track" | string | null;
 
+interface BriefSignal {
+  icon: string;
+  text: string;
+  tone: "positive" | "warning" | "neutral";
+}
+
 interface StudentBriefProps {
   attentionStatus: AttentionStatus;
   attentionReason: string | null;
@@ -13,57 +19,85 @@ interface StudentBriefProps {
     overdueTasks: number;
     pendingAIRecommendations: number;
   };
-  pendingAIRecommendations: StudentProfileRecordLite[];
+  pendingAIRecommendations: Array<{ id: string; title: string; detail: string | null }>;
 }
 
-interface StudentProfileRecordLite {
-  id: string;
-  title: string;
-  detail: string | null;
-}
-
-function emphasis(status: AttentionStatus): "critical" | "attention" | "neutral" {
-  if (status === "Critical") return "critical";
-  if (status === "Attention") return "attention";
-  return "neutral";
-}
-
-function buildDecisionSummary(
-  status: AttentionStatus,
-  reason: string | null,
+function buildSignals(
   summary: StudentBriefProps["summary"],
-): string {
-  const signals: string[] = [];
-
-  if (status === "Critical") {
-    signals.push("This student requires immediate coaching attention.");
-  } else if (status === "Attention") {
-    signals.push("This student is showing signals that warrant a closer look.");
-  } else if (status === "On Track") {
-    signals.push("This student is on track. No intervention needed right now.");
-  }
-
-  if (reason && !signals.some((s) => s.includes(reason))) {
-    signals.push(reason);
-  }
+): BriefSignal[] {
+  const signals: BriefSignal[] = [];
 
   if (summary.overdueTasks > 0) {
-    signals.push(
-      `${summary.overdueTasks} overdue ${summary.overdueTasks === 1 ? "task" : "tasks"} need${summary.overdueTasks === 1 ? "s" : ""} follow-up.`,
-    );
+    signals.push({
+      icon: "warning",
+      text: `${summary.overdueTasks} overdue ${summary.overdueTasks === 1 ? "task requires" : "tasks require"} immediate follow-up.`,
+      tone: "warning",
+    });
   }
   if (summary.pendingAIRecommendations > 0) {
-    signals.push(
-      `${summary.pendingAIRecommendations} AI ${summary.pendingAIRecommendations === 1 ? "recommendation" : "recommendations"} pending review.`,
-    );
+    signals.push({
+      icon: "flag",
+      text: `${summary.pendingAIRecommendations} AI ${summary.pendingAIRecommendations === 1 ? "recommendation is" : "recommendations are"} pending coach review.`,
+      tone: "warning",
+    });
   }
   if (summary.activeSprints > 0) {
-    signals.push(
-      `${summary.activeSprints} active ${summary.activeSprints === 1 ? "sprint" : "sprints"} in execution.`,
-    );
+    signals.push({
+      icon: "check_circle",
+      text: `${summary.activeSprints} active ${summary.activeSprints === 1 ? "sprint is" : "sprints are"} currently in execution.`,
+      tone: "positive",
+    });
+  }
+  if (summary.upcomingSessions > 0) {
+    signals.push({
+      icon: "event",
+      text: `${summary.upcomingSessions} upcoming ${summary.upcomingSessions === 1 ? "session" : "sessions"} scheduled.`,
+      tone: "positive",
+    });
+  }
+  if (summary.openGoals > 0) {
+    signals.push({
+      icon: "target",
+      text: `${summary.openGoals} open ${summary.openGoals === 1 ? "goal" : "goals"} in progress.`,
+      tone: "neutral",
+    });
   }
 
-  return signals.join(" ");
+  return signals;
+}
+
+function buildOverallStatus(
+  attentionStatus: AttentionStatus,
+  attentionReason: string | null,
+  summary: StudentBriefProps["summary"],
+): string {
+  if (attentionReason) return attentionReason;
+
+  if (attentionStatus === "Critical") {
+    return "This student requires immediate coaching attention. Review all active signals below.";
+  }
+  if (attentionStatus === "Attention") {
+    return "This student is showing signals that warrant a closer look before the next session.";
+  }
+  if (summary.overdueTasks === 0 && summary.pendingAIRecommendations === 0) {
+    return "No critical signals at this time. Continue routine monitoring during scheduled sessions.";
+  }
+  return "Review the active signals below to determine the appropriate coaching response.";
+}
+
+function buildCoachingAction(
+  summary: StudentBriefProps["summary"],
+  pendingAI: Array<{ id: string; title: string; detail: string | null }>,
+): string {
+  const topAI = pendingAI[0];
+  if (topAI) return topAI.title;
+  if (summary.overdueTasks > 0)
+    return `Address ${summary.overdueTasks} overdue ${summary.overdueTasks === 1 ? "task" : "tasks"} before the next session.`;
+  if (summary.upcomingSessions > 0)
+    return "Prepare session materials and review student progress notes.";
+  if (summary.openGoals > 0)
+    return "Check in on open goal progress and update any milestone dates.";
+  return "No immediate action flagged for this student.";
 }
 
 export function StudentBrief({
@@ -72,77 +106,78 @@ export function StudentBrief({
   summary,
   pendingAIRecommendations,
 }: StudentBriefProps) {
-  const level = emphasis(attentionStatus);
-  const decisionText = buildDecisionSummary(attentionStatus, attentionReason, summary);
-  const topPending = pendingAIRecommendations.slice(0, 1)[0];
+  const signals = buildSignals(summary);
+  const overallStatus = buildOverallStatus(attentionStatus, attentionReason, summary);
+  const coachingAction = buildCoachingAction(summary, pendingAIRecommendations);
+  const topAI = pendingAIRecommendations[0];
 
   return (
-    <section
-      className={cn(
-        "overflow-hidden rounded border",
-        level === "critical"
-          ? "border-destructive/40 bg-destructive/5"
-          : level === "attention"
-            ? "border-outline-variant bg-surface-high"
-            : "border-outline-variant bg-surface",
-      )}
-    >
-      <div className="flex items-center gap-2 border-b border-outline-variant px-6 py-4">
-        <Icon
-          name="auto_awesome"
-          filled
-          className={cn(
-            "text-[18px]",
-            level === "critical" ? "text-destructive" : "text-on-surface-variant",
-          )}
-        />
-        <h2 className="text-xs font-mono font-semibold uppercase tracking-widest text-on-surface-variant">
+    <section className="border border-outline-variant bg-surface-lowest">
+      <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
+        <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+          <span className="inline-block h-2 w-2 bg-primary" />
           Coaching Brief
         </h2>
       </div>
 
-      <div className="grid gap-0 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="px-6 py-6 lg:border-r border-outline-variant">
-          <p className="text-base font-medium leading-relaxed text-on-surface md:text-lg">
-            {decisionText}
-          </p>
-          {level === "neutral" && (
-            <p className="mt-3 text-sm text-on-surface-variant">
-              Continue routine monitoring during scheduled sessions.
+      <div className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        {/* Left: situation + signals */}
+        <div className="space-y-6 px-6 py-6 md:border-r md:border-outline-variant">
+          <div>
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+              Current Situation
+            </p>
+            <p className="text-base leading-relaxed text-on-surface">
+              {overallStatus}
+            </p>
+          </div>
+
+          {signals.length > 0 && (
+            <div>
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+                Active Signals
+              </p>
+              <ul className="space-y-2.5">
+                {signals.map((signal, i) => (
+                  <li key={i} className="flex items-start gap-3 text-sm text-on-surface">
+                    <Icon
+                      name={signal.icon}
+                      className={cn(
+                        "mt-0.5 shrink-0 text-[16px]",
+                        signal.tone === "warning"
+                          ? "text-destructive"
+                          : "text-on-surface",
+                      )}
+                    />
+                    <span>{signal.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {signals.length === 0 && (
+            <p className="text-sm text-on-surface-variant">
+              No active signals at this time.
             </p>
           )}
         </div>
 
-        <div className="px-6 py-6 bg-surface-lowest/50">
-          <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
-            Next Coach Action
+        {/* Right: coaching recommendation */}
+        <div className="px-6 py-6">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-primary">
+            Coaching Recommendation
           </p>
-          {topPending ? (
-            <div className="mt-3 space-y-1">
-              <p className="font-medium text-on-surface">{topPending.title}</p>
-              {topPending.detail && (
-                <p className="text-sm text-on-surface-variant">
-                  Risk: {topPending.detail}
-                </p>
-              )}
-              <p className="mt-2 inline-flex items-center gap-1 text-xs font-mono text-on-surface-variant">
-                <Icon name="flag" className="text-[14px]" />
-                Pending review
+          <div className="border border-outline-variant bg-surface-low p-4">
+            <p className="italic leading-relaxed text-on-surface">
+              &ldquo;{coachingAction}&rdquo;
+            </p>
+            {topAI?.detail && (
+              <p className="mt-2 text-[11px] font-mono uppercase tracking-wider text-on-surface-variant">
+                Risk: {topAI.detail}
               </p>
-            </div>
-          ) : summary.overdueTasks > 0 ? (
-            <p className="mt-3 text-sm text-on-surface">
-              Clear {summary.overdueTasks} overdue {summary.overdueTasks === 1 ? "task" : "tasks"} in the Tasks panel.
-            </p>
-          ) : summary.upcomingSessions > 0 ? (
-            <p className="mt-3 text-sm text-on-surface">
-              {summary.upcomingSessions} upcoming {summary.upcomingSessions === 1 ? "session" : "sessions"} to prepare for.
-            </p>
-          ) : (
-            <p className="mt-3 text-sm text-on-surface-variant">
-              No immediate action flagged for this student.
-            </p>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </section>

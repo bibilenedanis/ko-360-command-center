@@ -36,7 +36,7 @@ function StudentProfilePage() {
 
   return (
     <AppShell>
-      <div className="space-y-8">
+      <div className="space-y-6">
         <StudentHeader
           name={student.name}
           studentId={student.studentId}

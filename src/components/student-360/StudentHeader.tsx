@@ -13,9 +13,9 @@ interface StudentHeaderProps {
   attentionReason: string | null;
 }
 
-function attentionEmphasis(status: AttentionStatus): "critical" | "attention" | "neutral" {
-  if (status === "Critical") return "critical";
-  if (status === "Attention") return "attention";
+function attentionEmphasis(s: AttentionStatus): "critical" | "attention" | "neutral" {
+  if (s === "Critical") return "critical";
+  if (s === "Attention") return "attention";
   return "neutral";
 }
 
@@ -25,103 +25,66 @@ export function StudentHeader({
   educationLevel,
   status,
   attentionStatus,
-  attentionReason,
 }: StudentHeaderProps) {
   const emphasis = attentionEmphasis(attentionStatus);
 
   return (
-    <header className="space-y-5">
+    <header>
       <Link
         to="/students"
         search={{ filter: "all" }}
-        className="inline-flex items-center gap-1.5 text-xs font-mono font-semibold uppercase tracking-wider text-on-surface-variant transition-opacity hover:opacity-70"
+        className="mb-3 inline-flex items-center gap-1 text-[11px] font-mono font-semibold uppercase tracking-wider text-on-surface-variant transition-opacity hover:opacity-70"
       >
-        <Icon name="arrow_back" className="text-[16px]" />
+        <Icon name="arrow_back" className="text-[14px]" />
         Students
       </Link>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0 space-y-3">
-          <p className="text-xs font-mono uppercase tracking-[0.18em] text-on-surface-variant">
-            Student 360
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-on-surface md:text-4xl">
-            {name}
-          </h1>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-on-surface-variant">
-            <span className="font-mono">{studentId}</span>
-            {educationLevel && (
-              <>
-                <span aria-hidden className="opacity-40">•</span>
-                <span>{educationLevel}</span>
-              </>
-            )}
-            {status && (
-              <>
-                <span aria-hidden className="opacity-40">•</span>
-                <span>{status}</span>
-              </>
-            )}
+      <div className="flex flex-col gap-4 border border-outline-variant bg-surface-lowest p-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-5">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center border border-outline-variant bg-surface-high">
+            <Icon name="person" className="text-[32px] text-on-surface-variant" />
+          </div>
+
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold tracking-tight text-on-surface">
+                {name}
+              </h1>
+              {status && (
+                <span className="bg-primary px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-on-primary">
+                  {status}
+                </span>
+              )}
+              {attentionStatus && emphasis !== "neutral" && (
+                <span
+                  className={cn(
+                    "border px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider",
+                    emphasis === "critical"
+                      ? "border-destructive/50 bg-destructive/10 text-destructive"
+                      : "border-outline-variant bg-surface-high text-on-surface",
+                  )}
+                >
+                  {attentionStatus}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-on-surface-variant">
+              {studentId !== "—" && (
+                <span className="flex items-center gap-1.5 font-mono">
+                  <Icon name="badge" className="text-[14px]" />
+                  {studentId}
+                </span>
+              )}
+              {educationLevel && (
+                <span className="flex items-center gap-1.5">
+                  <Icon name="school" className="text-[14px]" />
+                  {educationLevel}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-
-        {attentionStatus && (
-          <div
-            className={cn(
-              "shrink-0 rounded border px-5 py-4 lg:max-w-md",
-              emphasis === "critical" &&
-                "border-destructive/50 bg-destructive/5",
-              emphasis === "attention" &&
-                "border-outline-variant bg-surface-high",
-              emphasis === "neutral" &&
-                "border-outline-variant bg-surface",
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Icon
-                name={
-                  emphasis === "critical"
-                    ? "priority_high"
-                    : emphasis === "attention"
-                      ? "notifications_active"
-                      : "check_circle"
-                }
-                filled={emphasis === "critical"}
-                className={cn(
-                  "text-[18px]",
-                  emphasis === "critical"
-                    ? "text-destructive"
-                    : "text-on-surface-variant",
-                )}
-              />
-              <p
-                className={cn(
-                  "text-[10px] font-mono uppercase tracking-wider",
-                  emphasis === "critical"
-                    ? "text-destructive"
-                    : "text-on-surface-variant",
-                )}
-              >
-                Attention Status
-              </p>
-            </div>
-            <p
-              className={cn(
-                "mt-2 font-semibold",
-                emphasis === "critical"
-                  ? "text-destructive"
-                  : "text-on-surface",
-              )}
-            >
-              {attentionStatus}
-            </p>
-            {attentionReason && (
-              <p className="mt-1.5 text-sm leading-relaxed text-on-surface-variant">
-                {attentionReason}
-              </p>
-            )}
-          </div>
-        )}
       </div>
     </header>
   );
