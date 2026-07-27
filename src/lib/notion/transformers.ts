@@ -17,6 +17,19 @@ export function extractNumber(p: Record<string, unknown>, n: string): number | n
 export function extractFormulaString(p: Record<string, unknown>, n: string): string | null { return prop(p,n)?.formula?.string ?? null; }
 export function extractDate(p: Record<string, unknown>, n: string): string | null { return prop(p,n)?.date?.start ?? null; }
 
+export function extractRelationIds(
+  p: Record<string, unknown>,
+  n: string,
+): string[] {
+  const relation = prop(p, n)?.relation;
+
+  if (!Array.isArray(relation)) return [];
+
+  return relation
+    .map((item: any) => item?.id)
+    .filter((id: unknown): id is string => typeof id === "string");
+}
+
 function priorityCategory(priority: string | null, taskType: string | null): PriorityCategory {
   if (priority === "Critical") return "CRITICAL";
   const value = (taskType ?? "").toLowerCase();

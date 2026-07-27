@@ -170,9 +170,13 @@ function StudentRow({ student }: { student: StudentListItem }) {
   return (
     <div className="grid gap-4 px-6 py-5 md:grid-cols-[minmax(0,1.5fr)_minmax(120px,0.7fr)_minmax(130px,0.7fr)_minmax(0,2fr)] md:items-center">
       <div className="min-w-0">
-        <p className="truncate font-semibold text-on-surface">
+        <Link
+          to="/students/$studentId"
+          params={{ studentId: student.id }}
+          className="block truncate font-semibold text-on-surface hover:text-primary hover:underline hover:underline-offset-4"
+        >
           {student.name}
-        </p>
+        </Link>
         <p className="mt-1 text-xs font-mono text-on-surface-variant">
           {student.studentId}
           {student.educationLevel !== "—"
