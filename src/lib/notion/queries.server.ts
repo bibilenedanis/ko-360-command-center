@@ -1,4 +1,4 @@
-import type { GetDatabaseResponse } from "@notionhq/client/build/src/api-endpoints";
+import type { GetDataSourceResponse } from "@notionhq/client/build/src/api-endpoints";
 import { createNotionClient, isNotionClientError, APIResponseError } from "./client.server";
 import { getNotionConfig } from "./config.server";
 
@@ -80,12 +80,30 @@ export function fetchStudents() { return fetchDatabasePages(getNotionConfig().st
 export function fetchTasks() { return fetchDatabasePages(getNotionConfig().tasksDatabaseId, "Tasks"); }
 export function fetchAIRecommendations() { return fetchDatabasePages(getNotionConfig().aiRecommendationsDatabaseId, "AIRecommendations"); }
 
-export async function fetchDatabaseSchema(databaseId: string): Promise<NotionQueryOutcome<GetDatabaseResponse>> {
+export async function fetchDatabaseSchema(
+  databaseId: string,
+): Promise<NotionQueryOutcome<GetDataSourceResponse>> {
   const clientResult = createNotionClient();
-  if (!clientResult.ok) return { ok: false, reason: "not_configured", message: clientResult.message };
+
+  if (!clientResult.ok) {
+    return {
+      ok: false,
+      reason: "not_configured",
+      message: clientResult.message,
+    };
+  }
+
   try {
-    const schema = await clientResult.client.databases.retrieve({ database_id: databaseId });
-    return { ok: true, data: schema };
+    const dataSourceId = await resolveDataSourceId(databaseId);
+
+    const schema = await clientResult.client.dataSources.retrieve({
+      data_source_id: dataSourceId,
+    });
+
+    return {
+      ok: true,
+      data: schema,
+    };
   } catch (error) {
     return logNotionError("fetchDatabaseSchema", error);
   }
