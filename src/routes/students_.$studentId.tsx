@@ -13,7 +13,7 @@ const loadStudentProfile = createServerFn({ method: "GET" })
     return await getStudentProfileData(data.studentId);
   });
 
-export const Route = createFileRoute("/students/$studentId")({
+export const Route = createFileRoute("/students_/$studentId")({
   loader: async ({ params }) => {
     return await loadStudentProfile({
       data: { studentId: params.studentId },

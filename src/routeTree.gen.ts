@@ -16,7 +16,7 @@ import { Route as NotionSchemaRouteImport } from './routes/notion-schema'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ScheduleRouteImport } from './routes/schedule'
 import { Route as StudentsRouteImport } from './routes/students'
-import { Route as StudentsStudentIdRouteImport } from './routes/students.$studentId'
+import { Route as StudentsStudentIdRouteImport } from './routes/students_.$studentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -54,9 +54,9 @@ const StudentsRoute = StudentsRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const StudentsStudentIdRoute = StudentsStudentIdRouteImport.update({
-  id: '/$studentId',
-  path: '/$studentId',
-  getParentRoute: () => StudentsRoute,
+  id: '/students_/$studentId',
+  path: '/students/$studentId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -66,7 +66,7 @@ export interface FileRoutesByFullPath {
   '/notion-schema': typeof NotionSchemaRoute
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
-  '/students': typeof StudentsRouteWithChildren
+  '/students': typeof StudentsRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
 }
 export interface FileRoutesByTo {
@@ -76,7 +76,7 @@ export interface FileRoutesByTo {
   '/notion-schema': typeof NotionSchemaRoute
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
-  '/students': typeof StudentsRouteWithChildren
+  '/students': typeof StudentsRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
 }
 export interface FileRoutesById {
@@ -87,8 +87,8 @@ export interface FileRoutesById {
   '/notion-schema': typeof NotionSchemaRoute
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
-  '/students': typeof StudentsRouteWithChildren
-  '/students/$studentId': typeof StudentsStudentIdRoute
+  '/students': typeof StudentsRoute
+  '/students_/$studentId': typeof StudentsStudentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -120,7 +120,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/schedule'
     | '/students'
-    | '/students/$studentId'
+    | '/students_/$studentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -130,7 +130,8 @@ export interface RootRouteChildren {
   NotionSchemaRoute: typeof NotionSchemaRoute
   ResourcesRoute: typeof ResourcesRoute
   ScheduleRoute: typeof ScheduleRoute
-  StudentsRoute: typeof StudentsRouteWithChildren
+  StudentsRoute: typeof StudentsRoute
+  StudentsStudentIdRoute: typeof StudentsStudentIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -184,27 +185,15 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/students/$studentId': {
-      id: '/students/$studentId'
-      path: '/$studentId'
+    '/students_/$studentId': {
+      id: '/students_/$studentId'
+      path: '/students/$studentId'
       fullPath: '/students/$studentId'
       preLoaderRoute: typeof StudentsStudentIdRouteImport
-      parentRoute: typeof StudentsRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface StudentsRouteChildren {
-  StudentsStudentIdRoute: typeof StudentsStudentIdRoute
-}
-
-const StudentsRouteChildren: StudentsRouteChildren = {
-  StudentsStudentIdRoute: StudentsStudentIdRoute,
-}
-
-const StudentsRouteWithChildren = StudentsRoute._addFileChildren(
-  StudentsRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -213,7 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   NotionSchemaRoute: NotionSchemaRoute,
   ResourcesRoute: ResourcesRoute,
   ScheduleRoute: ScheduleRoute,
-  StudentsRoute: StudentsRouteWithChildren,
+  StudentsRoute: StudentsRoute,
+  StudentsStudentIdRoute: StudentsStudentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
