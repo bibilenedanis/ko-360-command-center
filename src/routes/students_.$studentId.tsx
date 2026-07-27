@@ -53,7 +53,13 @@ function StudentProfilePage() {
           pendingAIRecommendations={data.aiRecommendations}
         />
 
-        <StudentMetrics summary={summary} />
+        <StudentMetrics
+          attentionStatus={student.attentionStatus}
+          goals={data.goals}
+          sprints={data.sprints}
+          sessions={data.sessions}
+          summary={summary}
+        />
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <GoalsPanel items={data.goals} />
