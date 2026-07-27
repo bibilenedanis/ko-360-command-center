@@ -1,5 +1,6 @@
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { localizeSignalText } from "@/lib/ui/labels";
 
 type AttentionStatus = "Critical" | "Attention" | "On Track" | string | null;
 
@@ -22,43 +23,41 @@ interface StudentBriefProps {
   pendingAIRecommendations: Array<{ id: string; title: string; detail: string | null }>;
 }
 
-function buildSignals(
-  summary: StudentBriefProps["summary"],
-): BriefSignal[] {
+function buildSignals(summary: StudentBriefProps["summary"]): BriefSignal[] {
   const signals: BriefSignal[] = [];
 
   if (summary.overdueTasks > 0) {
     signals.push({
       icon: "warning",
-      text: `${summary.overdueTasks} overdue ${summary.overdueTasks === 1 ? "task requires" : "tasks require"} immediate follow-up.`,
+      text: `${summary.overdueTasks} gecikmiş görev acil takip gerektiriyor.`,
       tone: "warning",
     });
   }
   if (summary.pendingAIRecommendations > 0) {
     signals.push({
       icon: "flag",
-      text: `${summary.pendingAIRecommendations} AI ${summary.pendingAIRecommendations === 1 ? "recommendation is" : "recommendations are"} pending coach review.`,
+      text: `${summary.pendingAIRecommendations} AI önerisi koç incelemesi bekliyor.`,
       tone: "warning",
     });
   }
   if (summary.activeSprints > 0) {
     signals.push({
       icon: "check_circle",
-      text: `${summary.activeSprints} active ${summary.activeSprints === 1 ? "sprint is" : "sprints are"} currently in execution.`,
+      text: `${summary.activeSprints} aktif sprint yürütülüyor.`,
       tone: "positive",
     });
   }
   if (summary.upcomingSessions > 0) {
     signals.push({
       icon: "event",
-      text: `${summary.upcomingSessions} upcoming ${summary.upcomingSessions === 1 ? "session" : "sessions"} scheduled.`,
+      text: `${summary.upcomingSessions} yaklaşan görüşme planlandı.`,
       tone: "positive",
     });
   }
   if (summary.openGoals > 0) {
     signals.push({
       icon: "target",
-      text: `${summary.openGoals} open ${summary.openGoals === 1 ? "goal" : "goals"} in progress.`,
+      text: `${summary.openGoals} açık hedef devam ediyor.`,
       tone: "neutral",
     });
   }
@@ -71,18 +70,18 @@ function buildOverallStatus(
   attentionReason: string | null,
   summary: StudentBriefProps["summary"],
 ): string {
-  if (attentionReason) return attentionReason;
+  if (attentionReason) return localizeSignalText(attentionReason) || attentionReason;
 
   if (attentionStatus === "Critical") {
-    return "This student requires immediate coaching attention. Review all active signals below.";
+    return "Bu öğrenci acil koçluk müdahalesi gerektiriyor. Aşağıdaki tüm aktif sinyalleri inceleyin.";
   }
   if (attentionStatus === "Attention") {
-    return "This student is showing signals that warrant a closer look before the next session.";
+    return "Bu öğrenci, bir sonraki görüşmeden önce yakından bakılması gereken sinyaller gösteriyor.";
   }
   if (summary.overdueTasks === 0 && summary.pendingAIRecommendations === 0) {
-    return "No critical signals at this time. Continue routine monitoring during scheduled sessions.";
+    return "Şu anda kritik bir sinyal yok. Planlı görüşmelerde rutin takibi sürdürün.";
   }
-  return "Review the active signals below to determine the appropriate coaching response.";
+  return "Uygun koçluk aksiyonunu belirlemek için aşağıdaki aktif sinyalleri inceleyin.";
 }
 
 function buildCoachingAction(
@@ -92,12 +91,12 @@ function buildCoachingAction(
   const topAI = pendingAI[0];
   if (topAI) return topAI.title;
   if (summary.overdueTasks > 0)
-    return `Address ${summary.overdueTasks} overdue ${summary.overdueTasks === 1 ? "task" : "tasks"} before the next session.`;
+    return `Bir sonraki görüşmeden önce ${summary.overdueTasks} gecikmiş görevi ele alın.`;
   if (summary.upcomingSessions > 0)
-    return "Prepare session materials and review student progress notes.";
+    return "Görüşme materyallerini hazırlayın ve öğrenci ilerleme notlarını gözden geçirin.";
   if (summary.openGoals > 0)
-    return "Check in on open goal progress and update any milestone dates.";
-  return "No immediate action flagged for this student.";
+    return "Açık hedeflerin ilerleyişini kontrol edin ve dönüm noktası tarihlerini güncelleyin.";
+  return "Bu öğrenci için işaretli acil bir aksiyon yok.";
 }
 
 export function StudentBrief({
@@ -116,16 +115,15 @@ export function StudentBrief({
       <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
         <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
           <span className="inline-block h-2 w-2 bg-primary" />
-          Coaching Brief
+          Koçluk Özeti
         </h2>
       </div>
 
       <div className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        {/* Left: situation + signals */}
         <div className="space-y-6 px-6 py-6 md:border-r md:border-outline-variant">
           <div>
             <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-              Current Situation
+              Mevcut Durum
             </p>
             <p className="text-base leading-relaxed text-on-surface">
               {overallStatus}
@@ -135,7 +133,7 @@ export function StudentBrief({
           {signals.length > 0 && (
             <div>
               <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-                Active Signals
+                Aktif Sinyaller
               </p>
               <ul className="space-y-2.5">
                 {signals.map((signal, i) => (
@@ -158,15 +156,14 @@ export function StudentBrief({
 
           {signals.length === 0 && (
             <p className="text-sm text-on-surface-variant">
-              No active signals at this time.
+              Şu anda aktif sinyal yok.
             </p>
           )}
         </div>
 
-        {/* Right: coaching recommendation */}
         <div className="px-6 py-6">
           <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-primary">
-            Coaching Recommendation
+            Koçluk Önerisi
           </p>
           <div className="border border-outline-variant bg-surface-low p-4">
             <p className="italic leading-relaxed text-on-surface">

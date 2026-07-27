@@ -2,6 +2,7 @@ import type { StudentProfileRecord } from "@/lib/students/profile.server";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PanelHeader } from "./PanelHeader";
+import { localizeStatus, formatShortDateTR } from "@/lib/ui/labels";
 
 interface AIRecommendationsPanelProps {
   items: StudentProfileRecord[];
@@ -30,11 +31,11 @@ export function AIRecommendationsPanel({
   return (
     <section className="border border-outline-variant bg-surface-lowest">
       <PanelHeader
-        title="AI Recommendations"
+        title="AI Önerileri"
         count={items.length}
         badge={
           pendingCount > 0
-            ? { label: `${pendingCount} pending`, tone: "warning" }
+            ? { label: `${pendingCount} bekliyor`, tone: "warning" }
             : undefined
         }
       />
@@ -78,7 +79,7 @@ export function AIRecommendationsPanel({
                             : "border-outline-variant bg-surface-high text-on-surface",
                         )}
                       >
-                        {item.detail}
+                        {localizeStatus(item.detail) || item.detail}
                       </span>
                     )}
                     {item.status && (
@@ -90,14 +91,14 @@ export function AIRecommendationsPanel({
                             : "text-on-surface-variant",
                         )}
                       >
-                        {item.status}
+                        {localizeStatus(item.status)}
                       </span>
                     )}
                   </div>
                 </div>
                 {item.date && (
                   <p className="mt-1.5 pl-6 text-[11px] font-mono text-on-surface-variant">
-                    Generated {item.date}
+                    Oluşturuldu: {formatShortDateTR(item.date)}
                   </p>
                 )}
               </div>
@@ -106,7 +107,7 @@ export function AIRecommendationsPanel({
         </div>
       ) : (
         <p className="px-5 py-5 text-sm text-on-surface-variant">
-          No AI recommendations for this student.
+          Bu öğrenci için AI önerisi yok.
         </p>
       )}
     </section>

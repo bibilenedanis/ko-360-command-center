@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/app-shell/AppShell";
-import { getStudentsData } from "@/lib/students/data.server";
+import { getStudentsData, type StudentsData } from "@/lib/students/data.server";
 import type { StudentAttentionStatus, StudentListItem } from "@/types/koc360";
+import { localizeStatus, localizeSignalText } from "@/lib/ui/labels";
 
 type StudentFilter = "all" | "critical" | "attention" | "on-track";
 
@@ -27,12 +28,12 @@ export const Route = createFileRoute("/students")({
 
   head: () => ({
     meta: [
-      { title: "Students — Koç360" },
-      { name: "description", content: "Manage your students in Koç360." },
-      { property: "og:title", content: "Students — Koç360" },
+      { title: "Öğrenciler — Koç360" },
+      { name: "description", content: "Koç360'ta öğrencilerinizi yönetin." },
+      { property: "og:title", content: "Öğrenciler — Koç360" },
       {
         property: "og:description",
-        content: "Student roster and attention overview in Koç360.",
+        content: "Koç360'ta öğrenci listesi ve dikkat durumu genel görünümü.",
       },
     ],
   }),
@@ -45,10 +46,10 @@ export const Route = createFileRoute("/students")({
 });
 
 function StudentsPage() {
-  const data = Route.useLoaderData();
+  const data = Route.useLoaderData() as StudentsData;
   const { filter } = Route.useSearch();
 
-  const students = data.students.filter((student) => {
+  const students = data.students.filter((student: StudentListItem) => {
     if (filter === "critical") {
       return student.status === "Active" && student.attentionStatus === "Critical";
     }
@@ -71,18 +72,18 @@ function StudentsPage() {
   const counts = {
     all: data.students.length,
     critical: data.students.filter(
-      (student) =>
+      (student: StudentListItem) =>
         student.status === "Active" &&
         student.attentionStatus === "Critical",
     ).length,
     attention: data.students.filter(
-      (student) =>
+      (student: StudentListItem) =>
         student.status === "Active" &&
         (student.attentionStatus === "Critical" ||
           student.attentionStatus === "Attention"),
     ).length,
     onTrack: data.students.filter(
-      (student) =>
+      (student: StudentListItem) =>
         student.status === "Active" &&
         student.attentionStatus === "On Track",
     ).length,
@@ -93,45 +94,45 @@ function StudentsPage() {
       <div className="space-y-6">
         <header>
           <p className="text-xs font-mono uppercase tracking-[0.18em] text-on-surface-variant">
-            Student Management
+            Öğrenci Yönetimi
           </p>
           <h1 className="mt-2 text-3xl font-semibold text-on-surface">
-            Students
+            Öğrenciler
           </h1>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Student roster and current attention status from Koç360.
+            Koç360'tan güncel öğrenci listesi ve dikkat durumu.
           </p>
         </header>
 
         <nav className="flex flex-wrap gap-2">
           <FilterLink filter="all" active={filter === "all"}>
-            All Students ({counts.all})
+            Tüm Öğrenciler ({counts.all})
           </FilterLink>
 
           <FilterLink filter="critical" active={filter === "critical"}>
-            Critical ({counts.critical})
+            Kritik ({counts.critical})
           </FilterLink>
 
           <FilterLink filter="attention" active={filter === "attention"}>
-            Needs Attention ({counts.attention})
+            Dikkat Gerekiyor ({counts.attention})
           </FilterLink>
 
           <FilterLink filter="on-track" active={filter === "on-track"}>
-            On Track ({counts.onTrack})
+            Yolunda ({counts.onTrack})
           </FilterLink>
         </nav>
 
         <section className="bg-surface border border-outline-variant rounded overflow-hidden">
           {students.length > 0 ? (
             <div className="divide-y divide-[color:var(--outline-variant)]">
-              {students.map((student) => (
+              {students.map((student: StudentListItem) => (
                 <StudentRow key={student.id} student={student} />
               ))}
             </div>
           ) : (
             <div className="px-6 py-12 text-center">
               <p className="text-sm text-on-surface-variant">
-                No students match this filter.
+                Bu filtreye uyan öğrenci yok.
               </p>
             </div>
           )}
@@ -187,24 +188,24 @@ function StudentRow({ student }: { student: StudentListItem }) {
 
       <div>
         <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
-          Status
+          Durum
         </p>
-        <p className="mt-1 text-sm text-on-surface">{student.status}</p>
+        <p className="mt-1 text-sm text-on-surface">{localizeStatus(student.status) || student.status}</p>
       </div>
 
       <div>
         <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
-          Attention
+          Dikkat
         </p>
         <AttentionBadge status={student.attentionStatus} />
       </div>
 
       <div className="min-w-0">
         <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
-          Reason
+          Neden
         </p>
         <p className="mt-1 text-sm text-on-surface-variant">
-          {student.attentionReason}
+          {localizeSignalText(student.attentionReason) || student.attentionReason}
         </p>
       </div>
     </div>
@@ -214,7 +215,7 @@ function StudentRow({ student }: { student: StudentListItem }) {
 function AttentionBadge({ status }: { status: StudentAttentionStatus }) {
   return (
     <span className="mt-1 inline-flex rounded border border-outline-variant bg-surface-high px-2 py-1 text-xs font-mono font-semibold text-on-surface">
-      {status}
+      {localizeStatus(status)}
     </span>
   );
 }

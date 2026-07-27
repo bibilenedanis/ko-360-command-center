@@ -3,15 +3,15 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
 const primaryNav = [
-  { to: "/", label: "Command Center", icon: "dashboard" },
-  { to: "/students", label: "Students", icon: "group" },
-  { to: "/schedule", label: "Schedule", icon: "event_note" },
-  { to: "/resources", label: "Resources", icon: "menu_book" },
+  { to: "/", label: "Kontrol Merkezi", icon: "dashboard" },
+  { to: "/students", label: "Öğrenciler", icon: "group" },
+  { to: "/schedule", label: "Takvim", icon: "event_note" },
+  { to: "/resources", label: "Kaynaklar", icon: "menu_book" },
 ] as const;
 
 const bottomNav = [
-  { to: "/", label: "Settings", icon: "settings" },
-  { to: "/", label: "Help", icon: "help" },
+  { to: "/", label: "Ayarlar", icon: "settings" },
+  { to: "/", label: "Yardım", icon: "help" },
 ] as const;
 
 export function Sidebar() {
@@ -20,7 +20,7 @@ export function Sidebar() {
       <div className="px-6 py-6">
         <h1 className="text-2xl font-extrabold tracking-tight text-primary">Koç360</h1>
         <p className="mt-1 text-[10px] uppercase tracking-widest text-secondary font-mono">
-          Coach Dashboard
+          Koç Paneli
         </p>
       </div>
 

@@ -1,5 +1,6 @@
 import type { StudentProfileRecord } from "@/lib/students/profile.server";
 import { PanelHeader } from "./PanelHeader";
+import { localizeStatus } from "@/lib/ui/labels";
 
 interface GoalsPanelProps {
   items: StudentProfileRecord[];
@@ -8,7 +9,7 @@ interface GoalsPanelProps {
 export function GoalsPanel({ items }: GoalsPanelProps) {
   return (
     <section className="border border-outline-variant bg-surface-lowest">
-      <PanelHeader title="Goals" count={items.length} />
+      <PanelHeader title="Hedefler" count={items.length} />
 
       {items.length > 0 ? (
         <div className="divide-y divide-[color:var(--outline-variant)]">
@@ -20,7 +21,7 @@ export function GoalsPanel({ items }: GoalsPanelProps) {
                 </p>
                 {item.status && (
                   <span className="shrink-0 border border-outline-variant bg-surface-high px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-on-surface">
-                    {item.status}
+                    {localizeStatus(item.status)}
                   </span>
                 )}
               </div>
@@ -34,7 +35,7 @@ export function GoalsPanel({ items }: GoalsPanelProps) {
         </div>
       ) : (
         <p className="px-5 py-5 text-sm text-on-surface-variant">
-          No active goals for this student.
+          Bu öğrenci için aktif hedef yok.
         </p>
       )}
     </section>

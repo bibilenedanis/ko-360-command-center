@@ -15,16 +15,16 @@ const loadCommandCenterData = createServerFn({ method: "GET" }).handler(async ()
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Koç360 — Command Center" },
+      { title: "Koç360 — Kontrol Merkezi" },
       {
         name: "description",
         content:
-          "Daily coaching command center. AI briefing, today's priorities, and students needing attention.",
+          "Günlük koçluk kontrol merkezi. AI özeti, bugünün öncelikleri ve dikkat gereken öğrenciler.",
       },
-      { property: "og:title", content: "Koç360 — Command Center" },
+      { property: "og:title", content: "Koç360 — Kontrol Merkezi" },
       {
         property: "og:description",
-        content: "Daily coaching command center for Koç360 coaches.",
+        content: "Koç360 koçları için günlük koçluk kontrol merkezi.",
       },
     ],
   }),

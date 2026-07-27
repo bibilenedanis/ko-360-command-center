@@ -2,10 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/icon";
 
 const topNav = [
-  { to: "/", label: "Command Center" },
-  { to: "/students", label: "Students" },
-  { to: "/schedule", label: "Schedule" },
-  { to: "/resources", label: "Resources" },
+  { to: "/", label: "Kontrol Merkezi" },
+  { to: "/students", label: "Öğrenciler" },
+  { to: "/schedule", label: "Takvim" },
+  { to: "/resources", label: "Kaynaklar" },
 ] as const;
 
 export function TopNavigation() {
@@ -31,7 +31,7 @@ export function TopNavigation() {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            aria-label="Calendar"
+            aria-label="Takvim"
             className="p-2 rounded-full hover:bg-surface-high transition-colors text-primary"
           >
             <Icon name="calendar_today" className="text-[22px]" />

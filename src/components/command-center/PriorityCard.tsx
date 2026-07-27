@@ -1,6 +1,7 @@
 import { Icon } from "@/components/icon";
 import type { PriorityItem } from "@/types/koc360";
 import { cn } from "@/lib/utils";
+import { localizeCategory } from "@/lib/ui/labels";
 
 interface Props {
   item: PriorityItem;
@@ -23,7 +24,7 @@ export function PriorityCard({ item }: Props) {
               : "border border-outline-variant text-secondary",
           )}
         >
-          {item.category}
+          {localizeCategory(item.category)}
         </span>
         <Icon
           name="arrow_forward"

@@ -23,7 +23,7 @@ export const Route = createFileRoute("/students_/$studentId")({
       { title: "Student 360 — Koç360" },
       {
         name: "description",
-        content: "Student 360 coaching profile in Koç360.",
+        content: "Koç360 Student 360 koçluk profili.",
       },
     ],
   }),

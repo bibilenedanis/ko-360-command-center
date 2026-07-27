@@ -1,12 +1,15 @@
 import { Icon } from "@/components/icon";
 import type { DailyBrief as DailyBriefType } from "@/types/koc360";
+import { localizeSignalText } from "@/lib/ui/labels";
 
 interface Props {
   brief: DailyBriefType;
 }
 
 export function DailyBrief({ brief }: Props) {
-  const { greeting, body, highlight } = brief;
+  const greeting = localizeSignalText(brief.greeting) || brief.greeting;
+  const body = localizeSignalText(brief.body);
+  const highlight = brief.highlight ? localizeSignalText(brief.highlight) : undefined;
 
   const rendered = highlight && body.includes(highlight)
     ? body.split(highlight).flatMap((chunk, i, arr) =>
@@ -21,7 +24,7 @@ export function DailyBrief({ brief }: Props) {
       <header className="flex items-center gap-2 mb-5">
         <Icon name="auto_awesome" filled className="text-primary text-[20px]" />
         <h2 className="text-xs font-mono font-semibold uppercase tracking-widest text-secondary">
-          AI Daily Brief
+          AI Günlük Özet
         </h2>
       </header>
       <p className="text-2xl md:text-[32px] leading-tight font-semibold tracking-tight text-primary">

@@ -1,5 +1,6 @@
 import type { StudentProfileRecord } from "@/lib/students/profile.server";
 import { cn } from "@/lib/utils";
+import { formatDayTR, formatMonthTR } from "@/lib/ui/labels";
 
 interface StudentMetricsProps {
   attentionStatus: string | null;
@@ -33,22 +34,10 @@ function nearestSession(sessions: StudentProfileRecord[]): StudentProfileRecord 
 function riskLabel(
   attention: string | null,
 ): { label: string; tone: "critical" | "elevated" | "stable" } {
-  if (attention === "Critical") return { label: "Critical", tone: "critical" };
-  if (attention === "Attention") return { label: "Elevated", tone: "elevated" };
-  if (attention === "On Track") return { label: "Stable", tone: "stable" };
+  if (attention === "Critical") return { label: "Kritik", tone: "critical" };
+  if (attention === "Attention") return { label: "Yüksek", tone: "elevated" };
+  if (attention === "On Track") return { label: "Düşük", tone: "stable" };
   return { label: "—", tone: "stable" };
-}
-
-function formatSessionDate(date: string): { day: string; month: string } {
-  try {
-    const d = new Date(date);
-    return {
-      day: d.toLocaleDateString("en-US", { day: "numeric" }),
-      month: d.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-    };
-  } catch {
-    return { day: date, month: "" };
-  }
 }
 
 /* ---------- State card ---------- */
@@ -139,12 +128,14 @@ export function StudentMetrics({
     sprints.find((s) => isActiveSprint(s.status)) ?? sprints[0] ?? null;
   const nextSession = nearestSession(sessions);
   const risk = riskLabel(attentionStatus);
+  const stateTone: "critical" | "elevated" | "default" =
+    risk.tone === "stable" ? "default" : risk.tone;
 
   return (
     <div className="space-y-4">
       {/* Row 1: state cards */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StateCard label="Active Goal">
+        <StateCard label="Aktif Hedef">
           {activeGoal ? (
             <p className="truncate text-lg font-semibold leading-tight text-on-surface">
               {activeGoal.title}
@@ -156,7 +147,7 @@ export function StudentMetrics({
           )}
         </StateCard>
 
-        <StateCard label="Active Sprint">
+        <StateCard label="Aktif Sprint">
           {activeSprint ? (
             <p className="truncate text-lg font-semibold leading-tight text-on-surface">
               {activeSprint.title}
@@ -168,7 +159,7 @@ export function StudentMetrics({
           )}
         </StateCard>
 
-        <StateCard label="Risk Level" tone={risk.tone}>
+        <StateCard label="Risk Seviyesi" tone={stateTone}>
           <div className="flex items-center gap-2">
             <span
               className={cn(
@@ -186,14 +177,11 @@ export function StudentMetrics({
           </div>
         </StateCard>
 
-        <StateCard label="Next Session">
+        <StateCard label="Sonraki Görüşme">
           {nextSession?.date ? (
             <div className="text-on-surface">
               <p className="text-lg font-semibold leading-tight">
-                {(() => {
-                  const { day, month } = formatSessionDate(nextSession.date);
-                  return `${month} ${day}`;
-                })()}
+                {`${formatDayTR(nextSession.date)} ${formatMonthTR(nextSession.date)}`}
               </p>
               <p className="mt-0.5 truncate text-xs text-on-surface-variant">
                 {nextSession.title}
@@ -210,7 +198,7 @@ export function StudentMetrics({
       {/* Row 2: analytical / trajectory cards */}
       <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <AnalyticalCard
-          label="Goal Progress"
+          label="Hedef İlerlemesi"
           progressLabel={
             activeGoal?.progress != null
               ? `${Math.round(Math.max(0, Math.min(100, activeGoal.progress)))}%`
@@ -225,7 +213,7 @@ export function StudentMetrics({
           {activeGoal?.progress != null ? (
             <>
               <div className="flex justify-between text-[10px] font-mono uppercase text-on-surface-variant">
-                <span>Current progress</span>
+                <span>Mevcut ilerleme</span>
                 <span>{Math.round(Math.max(0, Math.min(100, activeGoal.progress)))}%</span>
               </div>
               <p className="mt-1 truncate text-xs text-on-surface-variant">
@@ -235,17 +223,17 @@ export function StudentMetrics({
           ) : (
             <>
               <div className="flex justify-between text-[10px] font-mono uppercase text-on-surface-variant">
-                <span>Not available</span>
+                <span>Veri yok</span>
               </div>
               <p className="mt-1 text-xs text-on-surface-variant">
-                No progress value is available for the current goal.
+                Mevcut hedef için ilerleme verisi bulunmuyor.
               </p>
             </>
           )}
         </AnalyticalCard>
 
         <AnalyticalCard
-          label="Sprint Progress"
+          label="Sprint İlerlemesi"
           progressLabel={
             activeSprint?.progress != null
               ? `${Math.round(Math.max(0, Math.min(100, activeSprint.progress)))}%`
@@ -260,7 +248,7 @@ export function StudentMetrics({
           {activeSprint?.progress != null ? (
             <>
               <div className="flex justify-between text-[10px] font-mono uppercase text-on-surface-variant">
-                <span>Current progress</span>
+                <span>Mevcut ilerleme</span>
                 <span>{Math.round(Math.max(0, Math.min(100, activeSprint.progress)))}%</span>
               </div>
               <p className="mt-1 truncate text-xs text-on-surface-variant">
@@ -270,31 +258,31 @@ export function StudentMetrics({
           ) : (
             <>
               <div className="flex justify-between text-[10px] font-mono uppercase text-on-surface-variant">
-                <span>Not available</span>
+                <span>Veri yok</span>
               </div>
               <p className="mt-1 text-xs text-on-surface-variant">
-                No progress value is available for the current sprint.
+                Mevcut sprint için ilerleme verisi bulunmuyor.
               </p>
             </>
           )}
         </AnalyticalCard>
 
-        <AnalyticalCard label="Current Attention">
+        <AnalyticalCard label="Mevcut Durum">
           <div className="flex items-center justify-between">
             <span className="font-mono text-base font-semibold text-on-surface">
               {risk.label}
             </span>
             <div className="flex flex-col items-end gap-0.5 text-[10px] font-mono uppercase text-on-surface-variant">
-              <span>Tasks overdue: {summary.overdueTasks}</span>
-              <span>AI pending: {summary.pendingAIRecommendations}</span>
+              <span>Gecikmiş görevler: {summary.overdueTasks}</span>
+              <span>Bekleyen AI: {summary.pendingAIRecommendations}</span>
             </div>
           </div>
           <p className="mt-2 text-xs text-on-surface-variant">
             {summary.overdueTasks > 0
-              ? "Overdue work requires coach follow-up."
+              ? "Gecikmiş görevler koç takibi gerektiriyor."
               : summary.pendingAIRecommendations > 0
-                ? "AI recommendations await coach review."
-                : "No active risk signals at this time."}
+                ? "AI önerileri koç incelemesi bekliyor."
+                : "Şu anda aktif risk sinyali bulunmuyor."}
           </p>
         </AnalyticalCard>
       </section>

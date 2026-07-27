@@ -2,6 +2,7 @@ import type { StudentProfileRecord } from "@/lib/students/profile.server";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PanelHeader } from "./PanelHeader";
+import { localizeStatus, formatShortDateTR } from "@/lib/ui/labels";
 
 interface TasksPanelProps {
   items: StudentProfileRecord[];
@@ -29,11 +30,11 @@ export function TasksPanel({ items, overdueCount }: TasksPanelProps) {
   return (
     <section className="border border-outline-variant bg-surface-lowest">
       <PanelHeader
-        title="Tasks"
+        title="Görevler"
         count={items.length}
         badge={
           overdueCount > 0
-            ? { label: `${overdueCount} overdue`, tone: "danger" }
+            ? { label: `${overdueCount} gecikmiş`, tone: "danger" }
             : undefined
         }
       />
@@ -42,6 +43,7 @@ export function TasksPanel({ items, overdueCount }: TasksPanelProps) {
         <div className="divide-y divide-[color:var(--outline-variant)]">
           {active.map((item) => {
             const overdue = isOverdue(item);
+            const dateLabel = item.date ? formatShortDateTR(item.date) : null;
             return (
               <div
                 key={item.id}
@@ -64,15 +66,15 @@ export function TasksPanel({ items, overdueCount }: TasksPanelProps) {
                   >
                     {item.title}
                   </p>
-                  {(item.detail || item.date) && (
+                  {(item.detail || dateLabel) && (
                     <p
                       className={cn(
                         "mt-0.5 text-[11px] font-mono",
                         overdue ? "text-destructive" : "text-on-surface-variant",
                       )}
                     >
-                      {overdue && item.date ? "Overdue • " : ""}
-                      {[item.detail, !overdue ? item.date : null]
+                      {overdue && dateLabel ? "Gecikmiş • " : ""}
+                      {[item.detail, !overdue ? dateLabel : null]
                         .filter(Boolean)
                         .join("  •  ")}
                     </p>
@@ -87,7 +89,7 @@ export function TasksPanel({ items, overdueCount }: TasksPanelProps) {
                         : "border-outline-variant bg-surface-high text-on-surface",
                     )}
                   >
-                    {item.status}
+                    {localizeStatus(item.status)}
                   </span>
                 )}
               </div>
@@ -107,7 +109,7 @@ export function TasksPanel({ items, overdueCount }: TasksPanelProps) {
               </p>
               {item.status && (
                 <span className="shrink-0 border border-outline-variant bg-surface-high px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-on-surface">
-                  {item.status}
+                  {localizeStatus(item.status)}
                 </span>
               )}
             </div>
@@ -115,7 +117,7 @@ export function TasksPanel({ items, overdueCount }: TasksPanelProps) {
         </div>
       ) : (
         <p className="px-5 py-5 text-sm text-on-surface-variant">
-          No tasks for this student.
+          Bu öğrenci için görev yok.
         </p>
       )}
     </section>
