@@ -16,8 +16,8 @@ type DebugRecord = {
   found: boolean;
   id?: string;
   lastEditedTime?: string;
-  values?: Record<string, unknown>;
-  raw?: Record<string, unknown>;
+  values?: Record<string, any>;
+  raw?: Record<string, any>;
 };
 
 type NotionDebugReport = {
