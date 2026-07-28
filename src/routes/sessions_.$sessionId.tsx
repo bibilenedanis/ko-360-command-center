@@ -65,7 +65,7 @@ function SessionWorkspacePage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
           {/* Left: Notes (~45%) */}
           <div className="md:col-span-2 lg:col-span-5">
-            <SessionNotesPanel />
+            <SessionNotesPanel session={session} />
           </div>
 
           {/* Center: Agenda + Snapshot (~30%) */}

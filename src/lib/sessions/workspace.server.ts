@@ -5,6 +5,7 @@ import {
   extractSelect,
   extractTitle,
   extractCheckbox,
+  extractRichText,
 } from "@/lib/notion/transformers";
 import {
   getStudentProfileData,
@@ -19,6 +20,10 @@ export interface SessionWorkspaceSession {
   date: string | null;
   type: string | null;
   upcoming: boolean;
+  winsAndProgress: string;
+  challengesAndObstacles: string;
+  coreNotes: string;
+  commitments: string;
 }
 
 export interface SessionWorkspaceContext {
@@ -129,6 +134,10 @@ export async function getSessionWorkspaceData(
     date: extractDate(p, "Session Date"),
     type: extractSelect(p, "Session Type"),
     upcoming: extractCheckbox(p, "Upcoming"),
+    winsAndProgress: extractRichText(p, "Wins & Progress"),
+    challengesAndObstacles: extractRichText(p, "Challenges & Obstacles"),
+    coreNotes: extractRichText(p, "Core Notes"),
+    commitments: extractRichText(p, "Commitments"),
   };
 
   const activeGoal =
