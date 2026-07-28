@@ -224,8 +224,14 @@ async function validateSessionBelongsToSessionsDb(
   try {
     const page = await clientResult.client.pages.retrieve({ page_id: sessionId });
     const parent = "parent" in page ? page.parent : undefined;
-    if (!parent || parent.type !== "database_id") return false;
-    return "database_id" in parent && parent.database_id === sessionsDbId;
+    if (!parent) return false;
+    if (parent.type === "database_id") {
+      return parent.database_id === sessionsDbId;
+    }
+    if (parent.type === "data_source_id") {
+      return parent.database_id === sessionsDbId;
+    }
+    return false;
   } catch (error) {
     if (isNotionClientError(error) && error instanceof APIResponseError) {
       if (error.status === 404) return false;
