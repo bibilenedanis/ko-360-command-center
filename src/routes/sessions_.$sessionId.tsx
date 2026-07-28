@@ -42,7 +42,7 @@ function SessionWorkspacePage() {
   }
 
   const { session, profile, context } = result.data;
-  const { student } = profile;
+  const { student, summary } = profile;
 
   return (
     <AppShell>
@@ -53,36 +53,45 @@ function SessionWorkspacePage() {
           studentName={student.name}
           studentEducationLevel={student.educationLevel}
           studentAttentionStatus={student.attentionStatus}
+          openGoalCount={summary.openGoals}
+          activeGoalProgress={context.activeGoal?.progress ?? null}
+          activeSprintProgress={context.activeSprint?.progress ?? null}
         />
 
         <CoachingFlowStrip activeStep="session" />
 
         <AIBriefingPanel data={result.data} />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <div className="space-y-6 xl:col-span-2">
-            <StudentContextPanel
-              activeGoal={context.activeGoal}
-              activeSprint={context.activeSprint}
-              recentAssessment={context.recentAssessment}
-            />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Left: Notes (widest) */}
+          <div className="lg:col-span-6">
+            <SessionNotesPanel />
+          </div>
+
+          {/* Center: Agenda + Snapshot + Tasks */}
+          <div className="space-y-6 lg:col-span-3">
             <SessionAgendaPanel
               activeSprint={context.activeSprint}
               activeGoal={context.activeGoal}
               overdueTasks={context.overdueTasks}
             />
-            <SessionNotesPanel />
-          </div>
-
-          <div className="space-y-6">
-            <AIInsightsPanel
-              pending={context.pendingHighRiskAI}
-              others={context.otherAI}
+            <StudentContextPanel
+              activeGoal={context.activeGoal}
+              activeSprint={context.activeSprint}
+              recentAssessment={context.recentAssessment}
             />
             <SessionTasksPanel
               overdue={context.overdueTasks}
               upcoming={context.upcomingTasks}
               other={context.otherTasks}
+            />
+          </div>
+
+          {/* Right: AI Insights */}
+          <div className="lg:col-span-3">
+            <AIInsightsPanel
+              pending={context.pendingHighRiskAI}
+              others={context.otherAI}
             />
           </div>
         </div>

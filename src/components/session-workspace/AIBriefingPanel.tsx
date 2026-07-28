@@ -22,7 +22,7 @@ export function AIBriefingPanel({ data }: AIBriefingPanelProps) {
   if (summary.overdueTasks > 0) {
     signals.push({
       icon: "warning",
-      text: `${summary.overdueTasks} gecikmiş görev acil takip gerektiriyor.`,
+      text: `${summary.overdueTasks} gecikmiş görüşme öncesi takip gerektiriyor.`,
       tone: "warning",
     });
   }
@@ -60,21 +60,26 @@ export function AIBriefingPanel({ data }: AIBriefingPanelProps) {
     : null;
 
   const topAI = context.pendingHighRiskAI[0] ?? null;
+  const highRiskCount = context.pendingHighRiskAI.filter((r) => {
+    const d = (r.detail ?? "").toLowerCase();
+    return d.includes("high") || d.includes("critical");
+  }).length;
 
   return (
-    <section className="border border-outline-variant bg-surface-lowest">
-      <div className="flex items-center justify-between border-b border-outline-variant px-6 py-4">
-        <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-          <span className="inline-block h-2 w-2 bg-primary" />
+    <section className="border border-violet-200 bg-surface-lowest">
+      <div className="flex items-center justify-between border-b border-violet-200 bg-violet-50/50 px-6 py-4">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-violet-700">
+          <Icon name="auto_awesome" filled className="text-[18px]" />
           AI Görüşme Özeti
         </h2>
-        <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-violet-600/70">
           Mevcut verilerden derlenmiştir
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="space-y-6 px-6 py-6 md:border-r md:border-outline-variant">
+      <div className="grid grid-cols-1 gap-0 md:grid-cols-12">
+        {/* Left: situation + signals */}
+        <div className="space-y-5 px-6 py-6 md:col-span-7 md:border-r md:border-outline-variant">
           <div>
             <p className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
               Öğrencinin Mevcut Durumu
@@ -129,28 +134,63 @@ export function AIBriefingPanel({ data }: AIBriefingPanelProps) {
           )}
         </div>
 
-        <div className="px-6 py-6">
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-primary">
-            Öne Çıkan AI Önerisi
-          </p>
-          {topAI ? (
-            <div className="border border-outline-variant bg-surface-low p-4">
-              <p className="italic leading-relaxed text-on-surface">
-                &ldquo;{topAI.title}&rdquo;
+        {/* Right: metrics + top recommendation */}
+        <div className="space-y-5 px-6 py-6 md:col-span-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="border border-outline-variant bg-surface-low p-3">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                Gecikmiş Görev
               </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-on-surface-variant">
-                {topAI.detail && (
-                  <span>Risk: {localizeStatus(topAI.detail) || topAI.detail}</span>
+              <p
+                className={cn(
+                  "mt-1 text-xl font-bold tabular-nums leading-none",
+                  summary.overdueTasks > 0
+                    ? "text-destructive"
+                    : "text-on-surface",
                 )}
-                {topAI.status && (
-                  <span>· {localizeStatus(topAI.status)}</span>
-                )}
+              >
+                {summary.overdueTasks}
+              </p>
+            </div>
+            <div className="border border-outline-variant bg-surface-low p-3">
+              <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                Bekleyen AI
+              </p>
+              <p className="mt-1 text-xl font-bold tabular-nums leading-none text-on-surface">
+                {summary.pendingAIRecommendations}
+              </p>
+            </div>
+            {highRiskCount > 0 && (
+              <div className="col-span-2 border border-destructive/40 bg-destructive/5 p-3">
+                <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-destructive">
+                  Yüksek Riskli AI Önerisi
+                </p>
+                <p className="mt-1 text-xl font-bold tabular-nums leading-none text-destructive">
+                  {highRiskCount}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {topAI && (
+            <div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.08em] text-violet-700">
+                Öne Çıkan AI Önerisi
+              </p>
+              <div className="border border-violet-200 bg-violet-50/40 p-3">
+                <p className="italic leading-relaxed text-on-surface">
+                  &ldquo;{topAI.title}&rdquo;
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-on-surface-variant">
+                  {topAI.detail && (
+                    <span>Risk: {localizeStatus(topAI.detail) || topAI.detail}</span>
+                  )}
+                  {topAI.status && (
+                    <span>· {localizeStatus(topAI.status)}</span>
+                  )}
+                </div>
               </div>
             </div>
-          ) : (
-            <p className="text-sm text-on-surface-variant">
-              İnceleme bekleyen AI önerisi yok.
-            </p>
           )}
         </div>
       </div>

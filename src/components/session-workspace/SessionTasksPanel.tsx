@@ -1,4 +1,3 @@
-import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { localizeStatus, formatShortDateTR } from "@/lib/ui/labels";
 import type { StudentProfileRecord } from "@/lib/students/profile.server";
@@ -7,6 +6,71 @@ interface SessionTasksPanelProps {
   overdue: StudentProfileRecord[];
   upcoming: StudentProfileRecord[];
   other: StudentProfileRecord[];
+}
+
+function priorityTone(detail: string | null): "high" | "medium" | "low" | "none" {
+  const d = (detail ?? "").toLowerCase();
+  if (d.includes("high") || d.includes("yüksek") || d === "kr") return "high";
+  if (d.includes("medium") || d.includes("orta") || d === "or") return "medium";
+  if (d.includes("low") || d.includes("düşük") || d === "ds") return "low";
+  return "none";
+}
+
+function PriorityBadge({ detail }: { detail: string | null }) {
+  const tone = priorityTone(detail);
+  const label = detail ? localizeStatus(detail) || detail : "—";
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center rounded px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider",
+        tone === "high" && "bg-destructive/10 text-destructive",
+        tone === "medium" && "bg-primary/10 text-primary",
+        tone === "low" && "bg-surface-high text-on-surface-variant",
+        tone === "none" && "bg-surface-high text-on-surface-variant",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-[10px] font-mono text-on-surface-variant">—</span>;
+  return (
+    <span className="inline-flex shrink-0 items-center rounded bg-surface-high px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+      {localizeStatus(status)}
+    </span>
+  );
+}
+
+function TaskRow({
+  task,
+  overdue,
+}: {
+  task: StudentProfileRecord;
+  overdue?: boolean;
+}) {
+  return (
+    <tr className={cn("border-b border-outline-variant last:border-0", overdue && "bg-destructive/5")}>
+      <td className="py-3 pr-3">
+        <p className={cn("text-sm font-medium leading-snug", overdue ? "text-destructive" : "text-on-surface")}>
+          {task.title}
+        </p>
+        {task.date && (
+          <p className={cn("mt-0.5 text-[10px] font-mono", overdue ? "text-destructive" : "text-on-surface-variant")}>
+            {overdue ? "Gecikmiş • " : "Son Tarih: "}
+            {formatShortDateTR(task.date)}
+          </p>
+        )}
+      </td>
+      <td className="py-3 pr-3 align-middle">
+        <PriorityBadge detail={task.detail} />
+      </td>
+      <td className="py-3 align-middle">
+        <StatusBadge status={task.status} />
+      </td>
+    </tr>
+  );
 }
 
 export function SessionTasksPanel({
@@ -36,16 +100,33 @@ export function SessionTasksPanel({
       </div>
 
       {total > 0 ? (
-        <div className="divide-y divide-[color:var(--outline-variant)]">
-          {overdue.map((t) => (
-            <TaskRow key={t.id} task={t} overdue />
-          ))}
-          {upcoming.map((t) => (
-            <TaskRow key={t.id} task={t} />
-          ))}
-          {other.map((t) => (
-            <TaskRow key={t.id} task={t} />
-          ))}
+        <div className="px-5 py-4">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-outline-variant">
+                <th className="pb-2 pr-3 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                  Görev
+                </th>
+                <th className="pb-2 pr-3 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                  Öncelik
+                </th>
+                <th className="pb-2 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                  Durum
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {overdue.map((t) => (
+                <TaskRow key={t.id} task={t} overdue />
+              ))}
+              {upcoming.map((t) => (
+                <TaskRow key={t.id} task={t} />
+              ))}
+              {other.map((t) => (
+                <TaskRow key={t.id} task={t} />
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : (
         <p className="px-5 py-5 text-sm text-on-surface-variant">
@@ -53,67 +134,5 @@ export function SessionTasksPanel({
         </p>
       )}
     </section>
-  );
-}
-
-function TaskRow({
-  task,
-  overdue,
-}: {
-  task: StudentProfileRecord;
-  overdue?: boolean;
-}) {
-  const dateLabel = task.date ? formatShortDateTR(task.date) : null;
-  return (
-    <div
-      className={cn(
-        "flex items-center gap-3 px-5 py-3.5",
-        overdue && "bg-destructive/5",
-      )}
-    >
-      <Icon
-        name={overdue ? "warning" : "radio_button_unchecked"}
-        filled={overdue}
-        className={cn(
-          "shrink-0 text-[18px]",
-          overdue ? "text-destructive" : "text-on-surface-variant",
-        )}
-      />
-      <div className="min-w-0 flex-1">
-        <p
-          className={cn(
-            "text-sm font-medium leading-snug",
-            overdue ? "text-destructive" : "text-on-surface",
-          )}
-        >
-          {task.title}
-        </p>
-        {(task.detail || dateLabel) && (
-          <p
-            className={cn(
-              "mt-0.5 text-[11px] font-mono",
-              overdue ? "text-destructive" : "text-on-surface-variant",
-            )}
-          >
-            {overdue && dateLabel ? "Gecikmiş • " : ""}
-            {[task.detail, !overdue ? dateLabel : null]
-              .filter(Boolean)
-              .join("  •  ")}
-          </p>
-        )}
-      </div>
-      {task.status && (
-        <span
-          className={cn(
-            "shrink-0 border px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider",
-            overdue
-              ? "border-destructive/40 bg-destructive/10 text-destructive"
-              : "border-outline-variant bg-surface-high text-on-surface",
-          )}
-        >
-          {localizeStatus(task.status)}
-        </span>
-      )}
-    </div>
   );
 }

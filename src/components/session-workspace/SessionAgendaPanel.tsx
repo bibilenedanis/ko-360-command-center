@@ -1,4 +1,5 @@
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import type { StudentProfileRecord } from "@/lib/students/profile.server";
 
 interface SessionAgendaPanelProps {
@@ -12,6 +13,7 @@ interface AgendaItem {
   source: string;
   title: string;
   icon: string;
+  urgent?: boolean;
 }
 
 export function SessionAgendaPanel({
@@ -43,6 +45,7 @@ export function SessionAgendaPanel({
       source: "Gecikmiş Görev",
       title: task.title,
       icon: "warning",
+      urgent: true,
     });
   }
 
@@ -53,25 +56,35 @@ export function SessionAgendaPanel({
           <span className="inline-block h-2 w-2 bg-primary" />
           Görüşme Gündemi
         </h2>
-        <span className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
-          Mevcut kayıtlardan
-        </span>
       </div>
 
       <div className="px-5 py-4">
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
-          Görüşmede Ele Alınabilecek Konular
+        <p className="mb-3 text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
+          Mevcut öğrenci kayıtlarından oluşturulan görüşme bağlamı
         </p>
 
         {items.length > 0 ? (
-          <ul className="space-y-2.5">
+          <ul className="space-y-2">
             {items.map((item) => (
-              <li key={item.key} className="flex items-start gap-3">
-                <Icon
-                  name={item.icon}
-                  className="mt-0.5 shrink-0 text-[16px] text-on-surface-variant"
-                />
-                <div className="min-w-0">
+              <li
+                key={item.key}
+                className={cn(
+                  "flex items-start gap-3 rounded border px-3 py-2.5",
+                  item.urgent
+                    ? "border-destructive/30 bg-destructive/5"
+                    : "border-outline-variant bg-surface-low",
+                )}
+              >
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-outline-variant bg-surface-lowest">
+                  <Icon
+                    name={item.icon}
+                    className={cn(
+                      "text-[14px]",
+                      item.urgent ? "text-destructive" : "text-on-surface-variant",
+                    )}
+                  />
+                </span>
+                <div className="min-w-0 flex-1">
                   <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant">
                     {item.source}
                   </p>
