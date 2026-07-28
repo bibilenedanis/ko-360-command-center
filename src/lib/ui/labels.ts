@@ -29,6 +29,11 @@ const STATUS_LABELS: Record<string, string> = {
   Blocked: "Engellendi",
   Cancelled: "İptal",
   Canceled: "İptal",
+  // Session status
+  Scheduled: "Planlandı",
+  "Not Started": "Başlamadı",
+  "No Show": "Katılmadı",
+  Rescheduled: "Yeniden Planlandı",
 };
 
 export function localizeStatus(value: string | null | undefined): string {
@@ -72,6 +77,32 @@ const LEVEL_LABELS: Record<string, string> = {
 };
 export function localizeLevel(value: string): string {
   return LEVEL_LABELS[value] ?? value;
+}
+
+// Session type (Regular Coaching / Check-in / ...)
+const SESSION_TYPE_LABELS: Record<string, string> = {
+  "Regular Coaching": "Düzenli Koçluk",
+  "Check-in": "Kontrol",
+  "Check In": "Kontrol",
+  "Assessment Review": "Değerlendirme Gözden Geçirme",
+  "Goal Setting": "Hedef Belirleme",
+  "Sprint Planning": "Sprint Planlama",
+  "Sprint Review": "Sprint Değerlendirme",
+  "Progress Review": "İlerleme Değerlendirme",
+  "Initial Consultation": "Ön Görüşme",
+  Emergency: "Acil",
+};
+export function localizeSessionType(
+  value: string | null | undefined,
+): string {
+  if (!value) return "";
+  const key = value.trim();
+  if (!key) return "";
+  if (SESSION_TYPE_LABELS[key]) return SESSION_TYPE_LABELS[key];
+  const found = Object.keys(SESSION_TYPE_LABELS).find(
+    (k) => k.toLowerCase() === key.toLowerCase(),
+  );
+  return found ? SESSION_TYPE_LABELS[found] : value;
 }
 
 // Date helpers using Turkish locale

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { localizeStatus, formatShortDateTR } from "@/lib/ui/labels";
+import { localizeStatus, localizeSessionType, formatShortDateTR } from "@/lib/ui/labels";
 import type { SessionWorkspaceSession } from "@/lib/sessions/workspace.server";
 
 interface SessionHeaderProps {
@@ -102,7 +102,7 @@ export function SessionHeader({
                 {session.type && (
                   <span className="flex items-center gap-1.5">
                     <Icon name="category" className="text-[14px]" />
-                    {session.type}
+                    {localizeSessionType(session.type)}
                   </span>
                 )}
               </div>

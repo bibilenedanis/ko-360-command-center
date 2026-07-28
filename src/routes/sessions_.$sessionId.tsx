@@ -62,14 +62,14 @@ function SessionWorkspacePage() {
 
         <AIBriefingPanel data={result.data} />
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          {/* Left: Notes (widest) */}
-          <div className="lg:col-span-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
+          {/* Left: Notes (~45%) */}
+          <div className="md:col-span-2 lg:col-span-5">
             <SessionNotesPanel />
           </div>
 
-          {/* Center: Agenda + Snapshot + Tasks */}
-          <div className="space-y-6 lg:col-span-3">
+          {/* Center: Agenda + Snapshot + Tasks (~30%) */}
+          <div className="space-y-6 lg:col-span-4">
             <SessionAgendaPanel
               activeSprint={context.activeSprint}
               activeGoal={context.activeGoal}
@@ -87,7 +87,7 @@ function SessionWorkspacePage() {
             />
           </div>
 
-          {/* Right: AI Insights */}
+          {/* Right: AI Insights (~25%) */}
           <div className="lg:col-span-3">
             <AIInsightsPanel
               pending={context.pendingHighRiskAI}

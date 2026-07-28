@@ -1,4 +1,5 @@
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 
 const SECTIONS = [
   {
@@ -20,14 +21,14 @@ const SECTIONS = [
   {
     key: "commitments",
     label: "Taahhütler ve Çalışmalar",
-    hint: "Bir sonraki sprint için acción maddeleri...",
+    hint: "Bir sonraki sprint için takip maddeleri...",
   },
 ] as const;
 
 export function SessionNotesPanel() {
   return (
-    <section className="flex min-h-[560px] flex-col border border-outline-variant bg-surface-lowest">
-      <div className="flex items-center justify-between border-b border-outline-variant px-5 py-3.5">
+    <section className="flex flex-col border border-outline-variant bg-surface-lowest">
+      <div className="flex items-center justify-between border-b border-outline-variant px-5 py-3">
         <div className="flex items-center gap-2">
           <Icon name="edit_note" className="text-[18px] text-on-surface-variant" />
           <h2 className="text-sm font-bold text-on-surface">Görüşme Notları</h2>
@@ -37,31 +38,30 @@ export function SessionNotesPanel() {
         </span>
       </div>
 
-      <div className="flex-1 space-y-6 px-5 py-5">
+      <div className="flex-1 divide-y divide-outline-variant">
         {SECTIONS.map((s) => (
-          <div key={s.key}>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
+          <div key={s.key} className="px-5 py-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-on-surface-variant">
               {s.label}
-            </label>
-            <div
-              className={
-                s.highlighted
-                  ? "min-h-[120px] rounded border border-dashed border-outline-variant bg-surface-low p-4"
-                  : "min-h-[64px] rounded border border-dashed border-outline-variant bg-surface-low/50 p-4"
-              }
+            </p>
+            <p
+              className={cn(
+                "mt-1.5 text-sm leading-relaxed text-on-surface-variant/70",
+                s.highlighted && "border-l-2 border-outline-variant pl-3",
+              )}
             >
-              <p className="text-sm italic text-on-surface-variant/70">{s.hint}</p>
-            </div>
+              {s.hint}
+            </p>
           </div>
         ))}
+      </div>
 
-        <div className="flex items-start gap-3 border-t border-outline-variant pt-4">
-          <Icon name="lock" className="mt-0.5 shrink-0 text-[18px] text-on-surface-variant" />
-          <p className="text-sm leading-relaxed text-on-surface-variant">
-            Bu sürümde görüşme notları salt okunurdur. Not kaydetme özelliği
-            sonraki aşamada etkinleştirilecektir.
-          </p>
-        </div>
+      <div className="flex items-start gap-2.5 border-t border-outline-variant bg-surface-low/40 px-5 py-3">
+        <Icon name="lock" className="mt-0.5 shrink-0 text-[16px] text-on-surface-variant" />
+        <p className="text-xs leading-relaxed text-on-surface-variant">
+          Bu sürümde görüşme notları salt okunurdur. Not kaydetme özelliği
+          sonraki aşamada etkinleştirilecektir.
+        </p>
       </div>
     </section>
   );
