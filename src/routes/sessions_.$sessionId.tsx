@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { Icon } from "@/components/icon";
 import { SessionHeader } from "@/components/session-workspace/SessionHeader";
@@ -11,8 +12,40 @@ import { AIInsightsPanel } from "@/components/session-workspace/AIInsightsPanel"
 import { SessionTasksPanel } from "@/components/session-workspace/SessionTasksPanel";
 import {
   getSessionWorkspaceData,
+  updateSessionNotes,
   type SessionWorkspaceResult,
 } from "@/lib/sessions/workspace.server";
+
+const saveSessionNotes = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !("sessionId" in data) ||
+      typeof data.sessionId !== "string" ||
+      data.sessionId.length === 0 ||
+      !("winsAndProgress" in data) ||
+      typeof data.winsAndProgress !== "string" ||
+      !("challengesAndObstacles" in data) ||
+      typeof data.challengesAndObstacles !== "string" ||
+      !("coreNotes" in data) ||
+      typeof data.coreNotes !== "string" ||
+      !("commitments" in data) ||
+      typeof data.commitments !== "string"
+    ) {
+      throw new Error("Invalid input");
+    }
+    return data as {
+      sessionId: string;
+      winsAndProgress: string;
+      challengesAndObstacles: string;
+      coreNotes: string;
+      commitments: string;
+    };
+  })
+  .handler(async ({ data }) => {
+    return await updateSessionNotes(data);
+  });
 
 export const Route = createFileRoute("/sessions_/$sessionId")({
   loader: async ({ params }) => {
@@ -65,7 +98,7 @@ function SessionWorkspacePage() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
           {/* Left: Notes (~45%) */}
           <div className="md:col-span-2 lg:col-span-5">
-            <SessionNotesPanel session={session} />
+            <SessionNotesPanel session={session} onSave={saveSessionNotes} />
           </div>
 
           {/* Center: Agenda + Snapshot (~30%) */}

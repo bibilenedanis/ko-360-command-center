@@ -12,6 +12,8 @@ import {
   type StudentProfileData,
   type StudentProfileRecord,
 } from "@/lib/students/profile.server";
+import { createNotionClient, isNotionClientError, APIResponseError } from "@/lib/notion/client.server";
+import { getNotionConfig } from "@/lib/notion/config.server";
 
 export interface SessionWorkspaceSession {
   id: string;
@@ -189,4 +191,92 @@ export async function getSessionWorkspaceData(
       },
     },
   };
+}
+
+export interface UpdateSessionNotesInput {
+  sessionId: string;
+  winsAndProgress: string;
+  challengesAndObstacles: string;
+  coreNotes: string;
+  commitments: string;
+}
+
+export type UpdateSessionNotesResult =
+  | { ok: true }
+  | { ok: false; reason: "not_configured" | "session_not_found" | "api_error" | "unknown" };
+
+const USER_ERROR_MESSAGE = "Görüşme notları kaydedilemedi.";
+
+function toRichTextArray(value: string): Array<{ type: "text"; text: { content: string } }> {
+  if (value.length === 0) return [];
+  return [{ type: "text" as const, text: { content: value } }];
+}
+
+async function validateSessionBelongsToSessionsDb(
+  sessionId: string,
+): Promise<boolean> {
+  const clientResult = createNotionClient();
+  if (!clientResult.ok) return false;
+
+  const sessionsDbId = getNotionConfig().sessionsDatabaseId;
+  if (!sessionsDbId) return false;
+
+  try {
+    const page = await clientResult.client.pages.retrieve({ page_id: sessionId });
+    const parent = "parent" in page ? page.parent : undefined;
+    if (!parent || parent.type !== "database_id") return false;
+    return "database_id" in parent && parent.database_id === sessionsDbId;
+  } catch (error) {
+    if (isNotionClientError(error) && error instanceof APIResponseError) {
+      if (error.status === 404) return false;
+      console.error(`[notion] validateSessionBelongsToSessionsDb API error: status=${error.status} code=${error.code}`);
+    } else {
+      console.error("[notion] validateSessionBelongsToSessionsDb failed:", error);
+    }
+    return false;
+  }
+}
+
+export async function updateSessionNotes(
+  input: UpdateSessionNotesInput,
+): Promise<UpdateSessionNotesResult> {
+  const clientResult = createNotionClient();
+  if (!clientResult.ok) {
+    console.error("[notion] updateSessionNotes: client not configured");
+    return { ok: false, reason: "not_configured" };
+  }
+
+  const isValid = await validateSessionBelongsToSessionsDb(input.sessionId);
+  if (!isValid) {
+    return { ok: false, reason: "session_not_found" };
+  }
+
+  try {
+    await clientResult.client.pages.update({
+      page_id: input.sessionId,
+      properties: {
+        "Wins & Progress": {
+          rich_text: toRichTextArray(input.winsAndProgress),
+        },
+        "Challenges & Obstacles": {
+          rich_text: toRichTextArray(input.challengesAndObstacles),
+        },
+        "Core Notes": {
+          rich_text: toRichTextArray(input.coreNotes),
+        },
+        Commitments: {
+          rich_text: toRichTextArray(input.commitments),
+        },
+      },
+    });
+
+    return { ok: true };
+  } catch (error) {
+    if (isNotionClientError(error) && error instanceof APIResponseError) {
+      console.error(`[notion] updateSessionNotes API error: status=${error.status} code=${error.code}`);
+    } else {
+      console.error("[notion] updateSessionNotes failed:", error);
+    }
+    return { ok: false, reason: "api_error" };
+  }
 }
