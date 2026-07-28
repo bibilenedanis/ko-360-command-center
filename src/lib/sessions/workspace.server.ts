@@ -1,0 +1,183 @@
+import { fetchSessions } from "@/lib/notion/queries.server";
+import {
+  extractDate,
+  extractRelationIds,
+  extractSelect,
+  extractTitle,
+  extractCheckbox,
+} from "@/lib/notion/transformers";
+import {
+  getStudentProfileData,
+  type StudentProfileData,
+  type StudentProfileRecord,
+} from "@/lib/students/profile.server";
+
+export interface SessionWorkspaceSession {
+  id: string;
+  title: string;
+  status: string | null;
+  date: string | null;
+  type: string | null;
+  upcoming: boolean;
+}
+
+export interface SessionWorkspaceContext {
+  activeGoal: StudentProfileRecord | null;
+  activeSprint: StudentProfileRecord | null;
+  recentAssessment: StudentProfileRecord | null;
+  overdueTasks: StudentProfileRecord[];
+  upcomingTasks: StudentProfileRecord[];
+  otherTasks: StudentProfileRecord[];
+  pendingHighRiskAI: StudentProfileRecord[];
+  otherAI: StudentProfileRecord[];
+}
+
+export interface SessionWorkspaceData {
+  session: SessionWorkspaceSession;
+  profile: StudentProfileData;
+  context: SessionWorkspaceContext;
+}
+
+export type SessionWorkspaceResult =
+  | { ok: true; data: SessionWorkspaceData }
+  | { ok: false; reason: "session_not_found" | "student_missing" | "load_failed"; message: string };
+
+const DONE_STATUSES = new Set([
+  "done",
+  "completed",
+  "achieved",
+  "closed",
+  "cancelled",
+  "canceled",
+]);
+const ACTIVE_STATUSES = new Set(["active", "in progress", "ongoing"]);
+
+function isTaskDone(status: string | null): boolean {
+  return DONE_STATUSES.has((status ?? "").toLowerCase());
+}
+
+function isPast(iso: string | null): boolean {
+  if (!iso) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(iso);
+  d.setHours(0, 0, 0, 0);
+  return d < today;
+}
+
+function isHighRisk(detail: string | null): boolean {
+  const s = (detail ?? "").toLowerCase();
+  return s.includes("high") || s.includes("critical");
+}
+
+function isPendingReview(status: string | null): boolean {
+  const s = (status ?? "").toLowerCase();
+  return s.includes("pending") || s === "new" || s === "open";
+}
+
+export async function getSessionWorkspaceData(
+  sessionId: string,
+): Promise<SessionWorkspaceResult> {
+  const sessionsResult = await fetchSessions();
+  if (!sessionsResult.ok) {
+    return {
+      ok: false,
+      reason: "load_failed",
+      message: sessionsResult.message,
+    };
+  }
+
+  const sessionPage = sessionsResult.data.find((p) => p.id === sessionId);
+  if (!sessionPage) {
+    return {
+      ok: false,
+      reason: "session_not_found",
+      message: "Görüşme bulunamadı.",
+    };
+  }
+
+  const p = sessionPage.properties;
+  const studentIds = extractRelationIds(p, "Student");
+  const studentId = studentIds[0];
+
+  if (!studentId) {
+    return {
+      ok: false,
+      reason: "student_missing",
+      message: "Bu görüşmeye bağlı bir öğrenci bulunamadı.",
+    };
+  }
+
+  let profile: StudentProfileData;
+  try {
+    profile = await getStudentProfileData(studentId);
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "load_failed",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Öğrenci profili yüklenemedi.",
+    };
+  }
+
+  const session: SessionWorkspaceSession = {
+    id: sessionPage.id,
+    title: extractTitle(p, "Session") || "Görüşme",
+    status: extractSelect(p, "Status"),
+    date: extractDate(p, "Session Date"),
+    type: extractSelect(p, "Session Type"),
+    upcoming: extractCheckbox(p, "Upcoming"),
+  };
+
+  const activeGoal =
+    profile.goals.find((g) => !isTaskDone(g.status)) ?? null;
+
+  const activeSprint =
+    profile.sprints.find((s) =>
+      ACTIVE_STATUSES.has((s.status ?? "").toLowerCase()),
+    ) ?? null;
+
+  const recentAssessment =
+    [...profile.assessments]
+      .filter((a) => a.date)
+      .sort(
+        (a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime(),
+      )[0] ?? null;
+
+  const activeTasks = profile.tasks.filter((t) => !isTaskDone(t.status));
+  const overdueTasks = activeTasks.filter((t) => isPast(t.date));
+  const upcomingTasks = activeTasks
+    .filter((t) => !isPast(t.date) && t.date)
+    .sort(
+      (a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime(),
+    );
+  const otherTasks = activeTasks.filter((t) => !t.date);
+
+  const pendingHighRiskAI = profile.aiRecommendations.filter(
+    (r) => isPendingReview(r.status) || isHighRisk(r.detail),
+  );
+  const pendingSet = new Set(pendingHighRiskAI.map((r) => r.id));
+  const otherAI = profile.aiRecommendations.filter(
+    (r) => !pendingSet.has(r.id),
+  );
+
+  return {
+    ok: true,
+    data: {
+      session,
+      profile,
+      context: {
+        activeGoal,
+        activeSprint,
+        recentAssessment,
+        overdueTasks,
+        upcomingTasks,
+        otherTasks,
+        pendingHighRiskAI,
+        otherAI,
+      },
+    },
+  };
+}
