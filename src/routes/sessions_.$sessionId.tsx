@@ -68,7 +68,7 @@ function SessionWorkspacePage() {
             <SessionNotesPanel />
           </div>
 
-          {/* Center: Agenda + Snapshot + Tasks (~30%) */}
+          {/* Center: Agenda + Snapshot (~30%) */}
           <div className="space-y-6 lg:col-span-4">
             <SessionAgendaPanel
               activeSprint={context.activeSprint}
@@ -80,18 +80,18 @@ function SessionWorkspacePage() {
               activeSprint={context.activeSprint}
               recentAssessment={context.recentAssessment}
             />
+          </div>
+
+          {/* Right: AI Insights + Tasks (~25%) */}
+          <div className="space-y-6 lg:col-span-3">
+            <AIInsightsPanel
+              pending={context.pendingHighRiskAI}
+              others={context.otherAI}
+            />
             <SessionTasksPanel
               overdue={context.overdueTasks}
               upcoming={context.upcomingTasks}
               other={context.otherTasks}
-            />
-          </div>
-
-          {/* Right: AI Insights (~25%) */}
-          <div className="lg:col-span-3">
-            <AIInsightsPanel
-              pending={context.pendingHighRiskAI}
-              others={context.otherAI}
             />
           </div>
         </div>

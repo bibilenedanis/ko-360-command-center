@@ -101,21 +101,22 @@ export function SessionTasksPanel({
 
       {total > 0 ? (
         <div className="px-5 py-4">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-outline-variant">
-                <th className="pb-2 pr-3 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
-                  Görev
-                </th>
-                <th className="pb-2 pr-3 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
-                  Öncelik
-                </th>
-                <th className="pb-2 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
-                  Durum
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="max-h-[340px] overflow-y-auto">
+            <table className="w-full text-left">
+              <thead className="sticky top-0 bg-surface-lowest">
+                <tr className="border-b border-outline-variant">
+                  <th className="pb-2 pr-3 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                    Görev
+                  </th>
+                  <th className="pb-2 pr-3 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                    Öncelik
+                  </th>
+                  <th className="pb-2 text-[10px] font-mono font-bold uppercase tracking-wider text-on-surface-variant">
+                    Durum
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
               {overdue.map((t) => (
                 <TaskRow key={t.id} task={t} overdue />
               ))}
@@ -126,7 +127,8 @@ export function SessionTasksPanel({
                 <TaskRow key={t.id} task={t} />
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       ) : (
         <p className="px-5 py-5 text-sm text-on-surface-variant">
