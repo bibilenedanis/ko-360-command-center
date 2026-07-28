@@ -16,6 +16,7 @@ import { Route as NotionSchemaRouteImport } from './routes/notion-schema'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as ScheduleRouteImport } from './routes/schedule'
 import { Route as StudentsRouteImport } from './routes/students'
+import { Route as SessionsSessionIdRouteImport } from './routes/sessions_.$sessionId'
 import { Route as StudentsStudentIdRouteImport } from './routes/students_.$studentId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -53,6 +54,11 @@ const StudentsRoute = StudentsRouteImport.update({
   path: '/students',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
+  id: '/sessions_/$sessionId',
+  path: '/sessions/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudentsStudentIdRoute = StudentsStudentIdRouteImport.update({
   id: '/students_/$studentId',
   path: '/students/$studentId',
@@ -67,6 +73,7 @@ export interface FileRoutesByFullPath {
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
   '/students': typeof StudentsRoute
+  '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
 }
 export interface FileRoutesByTo {
@@ -77,6 +84,7 @@ export interface FileRoutesByTo {
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
   '/students': typeof StudentsRoute
+  '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/students/$studentId': typeof StudentsStudentIdRoute
 }
 export interface FileRoutesById {
@@ -88,6 +96,7 @@ export interface FileRoutesById {
   '/resources': typeof ResourcesRoute
   '/schedule': typeof ScheduleRoute
   '/students': typeof StudentsRoute
+  '/sessions_/$sessionId': typeof SessionsSessionIdRoute
   '/students_/$studentId': typeof StudentsStudentIdRoute
 }
 export interface FileRouteTypes {
@@ -100,6 +109,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/schedule'
     | '/students'
+    | '/sessions/$sessionId'
     | '/students/$studentId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -110,6 +120,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/schedule'
     | '/students'
+    | '/sessions/$sessionId'
     | '/students/$studentId'
   id:
     | '__root__'
@@ -120,6 +131,7 @@ export interface FileRouteTypes {
     | '/resources'
     | '/schedule'
     | '/students'
+    | '/sessions_/$sessionId'
     | '/students_/$studentId'
   fileRoutesById: FileRoutesById
 }
@@ -131,6 +143,7 @@ export interface RootRouteChildren {
   ResourcesRoute: typeof ResourcesRoute
   ScheduleRoute: typeof ScheduleRoute
   StudentsRoute: typeof StudentsRoute
+  SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   StudentsStudentIdRoute: typeof StudentsStudentIdRoute
 }
 
@@ -185,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StudentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sessions_/$sessionId': {
+      id: '/sessions_/$sessionId'
+      path: '/sessions/$sessionId'
+      fullPath: '/sessions/$sessionId'
+      preLoaderRoute: typeof SessionsSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/students_/$studentId': {
       id: '/students_/$studentId'
       path: '/students/$studentId'
@@ -203,18 +223,9 @@ const rootRouteChildren: RootRouteChildren = {
   ResourcesRoute: ResourcesRoute,
   ScheduleRoute: ScheduleRoute,
   StudentsRoute: StudentsRoute,
+  SessionsSessionIdRoute: SessionsSessionIdRoute,
   StudentsStudentIdRoute: StudentsStudentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

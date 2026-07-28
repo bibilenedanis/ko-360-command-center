@@ -3,6 +3,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PanelHeader } from "./PanelHeader";
 import { formatDayTR, formatMonthTR } from "@/lib/ui/labels";
+import { Link } from "@tanstack/react-router";
 
 interface SessionsPanelProps {
   items: StudentProfileRecord[];
@@ -29,10 +30,12 @@ export function SessionsPanel({ items }: SessionsPanelProps) {
           {ordered.map((item) => {
             const upcomingFlag = isUpcoming(item.date);
             return (
-              <div
+              <Link
                 key={item.id}
+                to="/sessions/$sessionId"
+                params={{ sessionId: item.id }}
                 className={cn(
-                  "flex items-center gap-3 px-5 py-3.5",
+                  "flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-surface-low",
                   !upcomingFlag && upcoming.length > 0 && "opacity-60",
                 )}
               >
@@ -68,7 +71,11 @@ export function SessionsPanel({ items }: SessionsPanelProps) {
                     Yaklaşan
                   </span>
                 )}
-              </div>
+                <Icon
+                  name="chevron_right"
+                  className="shrink-0 text-[16px] text-on-surface-variant"
+                />
+              </Link>
             );
           })}
         </div>
