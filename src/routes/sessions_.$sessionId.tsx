@@ -16,6 +16,17 @@ import {
   type SessionWorkspaceResult,
 } from "@/lib/sessions/workspace.server";
 
+const loadSessionWorkspace = createServerFn({ method: "GET" })
+  .validator((data: unknown) => {
+    if (!data || typeof data !== "object" || !("sessionId" in data) || typeof data.sessionId !== "string") {
+      throw new Error("Invalid sessionId");
+    }
+    return data as { sessionId: string };
+  })
+  .handler(async ({ data }) => {
+    return await getSessionWorkspaceData(data.sessionId);
+  });
+
 const saveSessionNotes = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
     if (
@@ -49,7 +60,7 @@ const saveSessionNotes = createServerFn({ method: "POST" })
 
 export const Route = createFileRoute("/sessions_/$sessionId")({
   loader: async ({ params }) => {
-    return await getSessionWorkspaceData(params.sessionId);
+    return await loadSessionWorkspace({ data: { sessionId: params.sessionId } });
   },
   head: () => ({
     meta: [
