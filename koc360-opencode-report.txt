@@ -1,72 +1,27 @@
-# Diagnostic Report: Session Notes Save Validation Failure
+# Final Report: Session Notes Data Source Validation Fix
 
-## A. Exact Reason Validation Returns False
+## 1. Files Modified
 
-**TWO distinct bugs** in `src/lib/sessions/workspace.server.ts:215-244`:
+- `src/lib/notion/queries.server.ts` — added `export` keyword to `resolveDataSourceId`
+- `src/lib/sessions/workspace.server.ts` — imported `resolveDataSourceId`, fixed validation logic
+- `koc360-opencode-report.txt` — this report (overwritten)
 
-### Bug 1: Wrong Property Access (Line 232)
-```typescript
-if (parent.type === "data_source_id") {
-  return parent.database_id === sessionsDbId;  // ❌ WRONG
-}
-```
-When `parent.type === "data_source_id"`, the parent object has `data_source_id`, not `database_id`. This is a property access error.
+## 2. Exact Validation Bug Fixed
 
-### Bug 2: Comparing Different ID Types
-- `sessionsDbId` comes from `process.env.NOTION_SESSIONS_DATABASE_ID` → DATABASE ID
-- `parent.data_source_id` (or even `parent.database_id`) from the page → DATA SOURCE ID
-- These are **different UUIDs**, not just different formats
+Two compounding bugs in `validateSessionBelongsToSessionsDb()`:
 
-The read path in `queries.server.ts:51` calls `resolveDataSourceId(databaseId)` which converts DATABASE ID → DATA SOURCE ID before querying. Pages returned have `parent.data_source_id` set to the DATA SOURCE ID.
+**Bug 1 (wrong property):** When `parent.type === "data_source_id"`, the code read `parent.database_id` which does not exist on a data_source parent object. Fixed to read `parent.data_source_id`.
 
-But the validation function compares against the raw DATABASE ID from config, causing mismatch.
+**Bug 2 (wrong ID type):** The comparison was against the configured DATABASE ID (`sessionsDbId`), but the page's `parent.data_source_id` contains a DATA SOURCE ID — a completely different identifier. Fixed by resolving the DATA SOURCE ID via `resolveDataSourceId(sessionsDbId)` before comparison.
 
-## B. Actual ID Representations
+## 3. resolveDataSourceId Export
 
-**Environment Variable:**
-- `NOTION_SESSIONS_DATABASE_ID` = DATABASE ID (hyphenated UUID, e.g., `07424ddf-47b7-4ffd-9ace-ac8aee71383f`)
+`resolveDataSourceId` was a private function at `src/lib/notion/queries.server.ts:33`. Added the `export` keyword. No other behavior changed — caching, error handling, and conversion logic are identical.
 
-**Notion API Response:**
-- `pages.retrieve()` returns page with `parent` object
-- If page is in a data source: `parent.type === "data_source_id"` and `parent.data_source_id` = DATA SOURCE ID (different UUID, likely non-hyphenated or different format)
-- If page is in a database: `parent.type === "database_id"` and `parent.database_id` = DATABASE ID
-
-**ID Relationship:**
-- DATABASE ID ≠ DATA SOURCE ID (they are different identifiers)
-- `resolveDataSourceId()` in `queries.server.ts:33-44` performs this conversion
-
-## C. Whether This Is an ID Normalization Issue
-
-**No.** This is not a hyphenation/format issue. This is:
-1. **Wrong property access:** Checking `parent.database_id` when type is `data_source_id`
-2. **Wrong ID comparison:** Comparing DATA SOURCE ID (from parent) against DATABASE ID (from config)
-
-Normalization (removing hyphens) would not fix this because the IDs themselves are different.
-
-## D. Whether sessionsDbId Is Database ID or Data Source ID
-
-**sessionsDbId is a DATABASE ID** (from `NOTION_SESSIONS_DATABASE_ID` environment variable).
-
-Evidence:
-- `queries.server.ts:51` calls `resolveDataSourceId(databaseId)` to convert it to a DATA SOURCE ID
-- `resolveDataSourceId()` retrieves the database and extracts `data_sources[0].id`
-- This conversion is only needed if `databaseId` is a DATABASE ID
-
-## E. Smallest Safe Fix
-
-**File:** `src/lib/sessions/workspace.server.ts:215-244`
-
-**Changes needed:**
-
-1. Import `resolveDataSourceId` from queries (or duplicate the logic)
-2. Resolve the DATA SOURCE ID from the DATABASE ID
-3. Fix the property access on line 232
-4. Compare against the resolved DATA SOURCE ID
+## 4. validateSessionBelongsToSessionsDb Final Logic
 
 ```typescript
-async function validateSessionBelongsToSessionsDb(
-  sessionId: string,
-): Promise<boolean> {
+async function validateSessionBelongsToSessionsDb(sessionId: string): Promise<boolean> {
   const clientResult = createNotionClient();
   if (!clientResult.ok) return false;
 
@@ -74,77 +29,10 @@ async function validateSessionBelongsToSessionsDb(
   if (!sessionsDbId) return false;
 
   try {
-    // Resolve DATABASE ID → DATA SOURCE ID
     const expectedDataSourceId = await resolveDataSourceId(sessionsDbId);
-    
     const page = await clientResult.client.pages.retrieve({ page_id: sessionId });
     const parent = "parent" in page ? page.parent : undefined;
     if (!parent) return false;
-    
-    if (parent.type === "database_id") {
-      return parent.database_id === sessionsDbId;
-    }
-    if (parent.type === "data_source_id") {
-      return parent.data_source_id === expectedDataSourceId;  // ✅ Fixed
-    }
-    return false;
-  } catch (error) {
-    // ... error handling unchanged
-  }
-}
-```
-
-**Note:** `resolveDataSourceId` is currently a private function in `queries.server.ts`. It needs to be exported, or the logic duplicated.
-
-## F. Exact File(s) That Would Need Modification
-
-1. **`src/lib/notion/queries.server.ts`**
-   - Export `resolveDataSourceId` function (line 33)
-
-2. **`src/lib/sessions/workspace.server.ts`**
-   - Import `resolveDataSourceId`
-   - Fix `validateSessionBelongsToSessionsDb()` to:
-     - Resolve DATA SOURCE ID from DATABASE ID
-     - Fix property access on line 232
-     - Compare against resolved DATA SOURCE ID
-
-## G. Whether Temporary Production-Safe Logging Is Required
-
-**Optional but recommended** to confirm diagnosis before deploying fix.
-
-**Diagnostic logging to add (temporarily):**
-
-```typescript
-async function validateSessionBelongsToSessionsDb(
-  sessionId: string,
-): Promise<boolean> {
-  const clientResult = createNotionClient();
-  if (!clientResult.ok) return false;
-
-  const sessionsDbId = getNotionConfig().sessionsDatabaseId;
-  if (!sessionsDbId) return false;
-
-  try {
-    const expectedDataSourceId = await resolveDataSourceId(sessionsDbId);
-    
-    const page = await clientResult.client.pages.retrieve({ page_id: sessionId });
-    const parent = "parent" in page ? page.parent : undefined;
-    
-    if (!parent) {
-      console.log("[notion-validate] parent is undefined");
-      return false;
-    }
-    
-    console.log("[notion-validate]", {
-      parentType: parent.type,
-      hasDatabaseId: "database_id" in parent,
-      hasDataSourceId: "data_source_id" in parent,
-      databaseId: "database_id" in parent ? parent.database_id : undefined,
-      dataSourceId: "data_source_id" in parent ? parent.data_source_id : undefined,
-      configuredDatabaseId: sessionsDbId,
-      expectedDataSourceId: expectedDataSourceId,
-    });
-    
     if (parent.type === "database_id") {
       return parent.database_id === sessionsDbId;
     }
@@ -153,47 +41,57 @@ async function validateSessionBelongsToSessionsDb(
     }
     return false;
   } catch (error) {
-    // ... existing error handling
+    // ... existing error handling (unchanged)
   }
 }
 ```
 
-**This logs:**
-- ✅ `parent.type` (to confirm if it's `database_id` or `data_source_id`)
-- ✅ Normalized IDs (no raw secrets)
-- ✅ Boolean comparison targets
-- ❌ No Notion token
-- ❌ No API keys
-- ❌ No full environment config
-- ❌ No page contents/student data
+## 5. database_id Branch Comparison
 
-**Remove after one successful Vercel deployment confirms the diagnosis.**
+`parent.database_id === sessionsDbId`
+— Unchanged. Compares page's database parent against the configured DATABASE ID.
 
-## Static Analysis Confidence
+## 6. data_source_id Branch Comparison
 
-**HIGH CONFIDENCE** that this is the exact issue:
+`parent.data_source_id === expectedDataSourceId`
+— Fixed. Compares page's data source parent against the resolved DATA SOURCE ID (obtained via `resolveDataSourceId(sessionsDbId)`).
 
-1. ✅ Code inspection shows `parent.database_id` accessed when `type === "data_source_id"` (line 232)
-2. ✅ Notion SDK v5.23.2 supports data sources with `parent.data_source_id` property
-3. ✅ `resolveDataSourceId()` proves DATABASE ID ≠ DATA SOURCE ID
-4. ✅ Read path uses DATA SOURCE ID for querying, so pages will have `parent.data_source_id`
-5. ✅ Validation compares against DATABASE ID, causing mismatch
-6. ✅ No other code path can return false after successful `pages.retrieve()`
+## 7. Session Notes Write Payload Changed?
 
-**The diagnosis is provable from static analysis. Logging is optional but would provide 100% confirmation.**
+No. `updateSessionNotes()` still writes exactly the same four properties:
+- Wins & Progress
+- Challenges & Obstacles
+- Core Notes
+- Commitments
 
-## Recommendation
+## 8. Notion Schema/Config Changed?
 
-**Deploy the fix directly** (no logging needed first):
+No. `config.server.ts` unchanged. Environment variable `NOTION_SESSIONS_DATABASE_ID` unchanged. No schema modifications.
 
-1. Export `resolveDataSourceId` from `queries.server.ts`
-2. Fix `validateSessionBelongsToSessionsDb()` in `workspace.server.ts`
-3. Deploy to Vercel
-4. Verify save works
-5. If it still fails, add diagnostic logging for one deployment
+## 9. Unrelated Code Changed?
 
-**Risk level:** LOW
-- Fix is minimal and targeted
-- No validation weakening
-- No security implications
-- Backward compatible (handles both `database_id` and `data_source_id` parent types)
+No. Only the two files listed in section 1 were modified. All changes are confined to the validation path.
+
+## 10. Production Build Result
+
+SUCCESS. `npm run build` (vite build) completed without errors:
+- Client build: 271 modules transformed
+- SSR build: 126 modules transformed
+- Nitro build: 293 modules transformed
+
+## 11. Commit Hash
+
+`250e3dc` — "Fix session notes data source validation"
+
+## 12. Push Result
+
+SUCCESS. Pushed to `origin/main`:
+```
+e074c94..250e3dc  main -> main
+```
+
+## 13. git status --short
+
+```
+```
+(Clean working tree — all changes committed and pushed.)
