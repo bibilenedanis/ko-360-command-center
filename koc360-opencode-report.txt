@@ -1,96 +1,148 @@
-# Final Report: Session Notes Data Source Validation Fix
+# Final Report: Session Notes Post-Save Revalidation Fix
 
-## 1. Files Modified
+## 1. Root Cause
 
-- `src/lib/notion/queries.server.ts` — added `export` keyword to `resolveDataSourceId`
-- `src/lib/sessions/workspace.server.ts` — imported `resolveDataSourceId`, fixed validation logic
-- `koc360-opencode-report.txt` — this report (overwritten)
+**Missing `createServerFn` wrapper for the route loader.**
 
-## 2. Exact Validation Bug Fixed
+The `sessions_.$sessionId.tsx` route loader was calling `getSessionWorkspaceData()` directly without wrapping it in a `createServerFn`. This violated the TanStack Start server function pattern used throughout the codebase.
 
-Two compounding bugs in `validateSessionBelongsToSessionsDb()`:
+When `router.invalidate()` triggered a client-side revalidation after save, the loader executed without proper server boundary isolation. This caused server-only code (`.server.ts` imports) to lose access to `process.env`, resulting in `getNotionConfig().sessionsDatabaseId` returning `undefined`.
 
-**Bug 1 (wrong property):** When `parent.type === "data_source_id"`, the code read `parent.database_id` which does not exist on a data_source parent object. Fixed to read `parent.data_source_id`.
+## 2. Why Initial Load Worked But router.invalidate() Failed
 
-**Bug 2 (wrong ID type):** The comparison was against the configured DATABASE ID (`sessionsDbId`), but the page's `parent.data_source_id` contains a DATA SOURCE ID — a completely different identifier. Fixed by resolving the DATA SOURCE ID via `resolveDataSourceId(sessionsDbId)` before comparison.
+**Initial SSR (Server-Side Rendering):**
+- Full server context available
+- `process.env` fully accessible
+- `.server.ts` modules execute in proper Node.js environment
+- Environment variables loaded correctly
+- Loader succeeds
 
-## 3. resolveDataSourceId Export
+**Client-side revalidation via router.invalidate():**
+- Loader invoked through client-side navigation
+- Without `createServerFn` wrapper, server boundary not properly established
+- Server-only code attempted to execute without full server context
+- `process.env.NOTION_SESSIONS_DATABASE_ID` unavailable (undefined)
+- `fetchDatabasePages(undefined, "Sessions")` returned error: "Sessions database ID is not set."
 
-`resolveDataSourceId` was a private function at `src/lib/notion/queries.server.ts:33`. Added the `export` keyword. No other behavior changed — caching, error handling, and conversion logic are identical.
+**Hard refresh worked** because it triggered full SSR again, restoring server context.
 
-## 4. validateSessionBelongsToSessionsDb Final Logic
+## 3. Server/Client Boundary Problem
 
+**Yes.** The route loader was not properly wrapped as a server function.
+
+Evidence:
+- All other routes in the codebase use `createServerFn` for data loading:
+  - `notion-health.tsx`: `const loadNotionHealth = createServerFn(...)`
+  - `notion-schema.tsx`: `const loadSchema = createServerFn(...)`
+  - `notion-debug.tsx`: `const loadNotionDebug = createServerFn(...)`
+  - `students.tsx`: `const loadStudents = createServerFn(...)`
+  - `index.tsx`: `const loadCommandCenterData = createServerFn(...)`
+
+- Only `sessions_.$sessionId.tsx` was calling `.server.ts` code directly in the loader without the wrapper.
+
+## 4. router.invalidate() Problem
+
+`router.invalidate()` itself is not the problem. It's the correct TanStack Start API for triggering route revalidation.
+
+**The problem was:** The loader was not structured as a proper server function, so when `router.invalidate()` triggered re-execution, the server boundary was not properly maintained.
+
+## 5. Exact Fix Applied
+
+**File:** `src/routes/sessions_.$sessionId.tsx`
+
+**Changes:**
+
+1. Added `loadSessionWorkspace` server function (lines 19-28):
 ```typescript
-async function validateSessionBelongsToSessionsDb(sessionId: string): Promise<boolean> {
-  const clientResult = createNotionClient();
-  if (!clientResult.ok) return false;
-
-  const sessionsDbId = getNotionConfig().sessionsDatabaseId;
-  if (!sessionsDbId) return false;
-
-  try {
-    const expectedDataSourceId = await resolveDataSourceId(sessionsDbId);
-    const page = await clientResult.client.pages.retrieve({ page_id: sessionId });
-    const parent = "parent" in page ? page.parent : undefined;
-    if (!parent) return false;
-    if (parent.type === "database_id") {
-      return parent.database_id === sessionsDbId;
+const loadSessionWorkspace = createServerFn({ method: "GET" })
+  .validator((data: unknown) => {
+    if (!data || typeof data !== "object" || !("sessionId" in data) || typeof data.sessionId !== "string") {
+      throw new Error("Invalid sessionId");
     }
-    if (parent.type === "data_source_id") {
-      return parent.data_source_id === expectedDataSourceId;
-    }
-    return false;
-  } catch (error) {
-    // ... existing error handling (unchanged)
-  }
-}
+    return data as { sessionId: string };
+  })
+  .handler(async ({ data }) => {
+    return await getSessionWorkspaceData(data.sessionId);
+  });
 ```
 
-## 5. database_id Branch Comparison
+2. Updated loader to call the server function (line 63):
+```typescript
+loader: async ({ params }) => {
+  return await loadSessionWorkspace({ data: { sessionId: params.sessionId } });
+},
+```
 
-`parent.database_id === sessionsDbId`
-— Unchanged. Compares page's database parent against the configured DATABASE ID.
+**Pattern matches** all other routes in the codebase.
 
-## 6. data_source_id Branch Comparison
+## 6. Save Flow After Fix
 
-`parent.data_source_id === expectedDataSourceId`
-— Fixed. Compares page's data source parent against the resolved DATA SOURCE ID (obtained via `resolveDataSourceId(sessionsDbId)`).
+1. User edits notes in `SessionNotesPanel`
+2. Clicks "Notları Kaydet"
+3. `handleSave()` sets state to "saving"
+4. Calls `saveSessionNotes` (POST server function) → writes to Notion
+5. Notion write succeeds → returns `{ ok: true }`
+6. Sets state to "saved"
+7. Calls `router.invalidate()` → triggers route revalidation
+8. Loader calls `loadSessionWorkspace` (GET server function) → proper server boundary
+9. Server fetches fresh data from Notion with full env access
+10. Returns updated `SessionWorkspaceResult`
+11. UI re-renders with new data
+12. `useEffect` in `SessionNotesPanel` syncs draft with new session data
+13. User sees updated notes without error state
+14. No hard refresh needed
 
-## 7. Session Notes Write Payload Changed?
+## 7. Changed Files
 
-No. `updateSessionNotes()` still writes exactly the same four properties:
+- `src/routes/sessions_.$sessionId.tsx` — added `loadSessionWorkspace` server function, updated loader
+
+**Only one file modified.**
+
+## 8. Notion Write Logic Changed?
+
+**No.** `updateSessionNotes()` in `src/lib/sessions/workspace.server.ts` unchanged.
+
+Still writes the same four properties:
 - Wins & Progress
 - Challenges & Obstacles
 - Core Notes
 - Commitments
 
-## 8. Notion Schema/Config Changed?
+## 9. Validation Logic Changed?
 
-No. `config.server.ts` unchanged. Environment variable `NOTION_SESSIONS_DATABASE_ID` unchanged. No schema modifications.
+**No.** `validateSessionBelongsToSessionsDb()` unchanged from previous fix.
 
-## 9. Unrelated Code Changed?
+Still validates:
+- `parent.type === "database_id"` → compares `parent.database_id === sessionsDbId`
+- `parent.type === "data_source_id"` → compares `parent.data_source_id === expectedDataSourceId`
 
-No. Only the two files listed in section 1 were modified. All changes are confined to the validation path.
+## 10. Schema/Config/Env Changed?
 
-## 10. Production Build Result
+**No.**
+- `src/lib/notion/config.server.ts` unchanged
+- `src/lib/notion/queries.server.ts` unchanged
+- Environment variables unchanged
+- Notion schema unchanged
 
-SUCCESS. `npm run build` (vite build) completed without errors:
-- Client build: 271 modules transformed
+## 11. Production Build Result
+
+**SUCCESS.** `npm run build` completed without errors:
+- Client build: 270 modules transformed
 - SSR build: 126 modules transformed
 - Nitro build: 293 modules transformed
 
-## 11. Commit Hash
+## 12. Commit Hash
 
-`250e3dc` — "Fix session notes data source validation"
+`c462360` — "Fix session notes post-save revalidation"
 
-## 12. Push Result
+## 13. Push Result
 
-SUCCESS. Pushed to `origin/main`:
+**SUCCESS.** Pushed to `origin/main`:
 ```
-e074c94..250e3dc  main -> main
+801c64b..c462360  main -> main
 ```
 
-## 13. git status --short
+## 14. git status --short
 
 ```
 ```
