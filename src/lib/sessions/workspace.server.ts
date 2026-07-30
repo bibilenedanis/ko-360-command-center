@@ -1,4 +1,4 @@
-import { fetchSessions } from "@/lib/notion/queries.server";
+import { fetchSessions, resolveDataSourceId } from "@/lib/notion/queries.server";
 import {
   extractDate,
   extractRelationIds,
@@ -222,6 +222,7 @@ async function validateSessionBelongsToSessionsDb(
   if (!sessionsDbId) return false;
 
   try {
+    const expectedDataSourceId = await resolveDataSourceId(sessionsDbId);
     const page = await clientResult.client.pages.retrieve({ page_id: sessionId });
     const parent = "parent" in page ? page.parent : undefined;
     if (!parent) return false;
@@ -229,7 +230,7 @@ async function validateSessionBelongsToSessionsDb(
       return parent.database_id === sessionsDbId;
     }
     if (parent.type === "data_source_id") {
-      return parent.database_id === sessionsDbId;
+      return parent.data_source_id === expectedDataSourceId;
     }
     return false;
   } catch (error) {

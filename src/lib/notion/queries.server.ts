@@ -30,7 +30,7 @@ function logNotionError(operation: string, error: unknown): NotionQueryError {
   return { ok: false, reason: "api_error", message: `Unexpected error during ${operation}.` };
 }
 
-async function resolveDataSourceId(databaseId: string): Promise<string> {
+export async function resolveDataSourceId(databaseId: string): Promise<string> {
   const cached = dataSourceCache.get(databaseId);
   if (cached) return cached;
   const clientResult = createNotionClient();
