@@ -21,6 +21,7 @@ import {
 } from "@/lib/report/report.mapper";
 import type { ReportWorkspaceData } from "@/lib/report/report.types";
 import { generateReportPrompt } from "@/lib/report/generate.server";
+import type { AIResponse } from "@/lib/ai/response.types";
 
 const loadReportWorkspace = createServerFn({ method: "GET" }).handler(
   async (): Promise<ReportWorkspaceData> => {
@@ -47,6 +48,7 @@ export const Route = createFileRoute("/report-workspace")({
 function ReportWorkspacePage() {
   const data = Route.useLoaderData() as ReportWorkspaceData;
   const [isGenerating, setIsGenerating] = useState(false);
+  const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
   const usedSources = getUsedSources(data);
   const missingSources = getMissingSources(data);
   const versionHistory = getVersionHistory(data);
@@ -54,71 +56,74 @@ function ReportWorkspacePage() {
   const handleGenerateAgain = async () => {
     setIsGenerating(true);
     try {
-      await generateReportPrompt({ data: { sessionId: data.session.id } });
-      toast.success("Prompt generated.");
+      const response = await generateReportPrompt({ data: { sessionId: data.session.id } });
+      setAiResponse(response);
+      toast.success("Report generated successfully.");
     } catch (error) {
-      console.error("Failed to generate prompt:", error);
-      toast.error("Prompt generation failed.");
+      console.error("Failed to generate report:", error);
+      toast.error("Report generation failed.");
     } finally {
       setIsGenerating(false);
     }
   };
 
+  const displayData = aiResponse ? transformAIResponseToWorkspaceData(aiResponse, data) : data;
+
   return (
-    <ReportShell reportStatus={data.report.metadata.reportStatus}>
+    <ReportShell reportStatus={displayData.report.metadata.reportStatus}>
       <ReportHeader
-        studentName={data.student.name}
-        sessionDate={data.session.date}
-        sprintName={data.sprint.name}
-        goal={data.sprint.goal}
-        completionPercent={data.report.metadata.completionPercent}
-        readingTimeMinutes={data.report.metadata.readingTimeMinutes}
-        lastGeneratedAt={data.report.metadata.lastGeneratedAt}
-        reportStatus={data.report.metadata.reportStatus}
-        draftLabel={data.report.metadata.draftLabel}
-        reviewLabel={data.report.metadata.reviewLabel}
+        studentName={displayData.student.name}
+        sessionDate={displayData.session.date}
+        sprintName={displayData.sprint.name}
+        goal={displayData.sprint.goal}
+        completionPercent={displayData.report.metadata.completionPercent}
+        readingTimeMinutes={displayData.report.metadata.readingTimeMinutes}
+        lastGeneratedAt={displayData.report.metadata.lastGeneratedAt}
+        reportStatus={displayData.report.metadata.reportStatus}
+        draftLabel={displayData.report.metadata.draftLabel}
+        reviewLabel={displayData.report.metadata.reviewLabel}
         isGenerating={isGenerating}
         onGenerateAgain={handleGenerateAgain}
       />
 
       <div className="max-w-[1400px] mx-auto p-4 grid grid-cols-12 gap-4">
         <div className="col-span-12 lg:col-span-8 space-y-8">
-          <AISummaryCard sections={data.report.summary} />
+          <AISummaryCard sections={displayData.report.summary} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TagCard
               title="Strengths"
               icon="add"
-              items={data.report.strengths}
+              items={displayData.report.strengths}
               variant="strength"
             />
             <TagCard
               title="Challenges"
               icon="warning"
-              items={data.report.challenges}
+              items={displayData.report.challenges}
               variant="challenge"
             />
           </div>
 
-          <CoachNotesCard value={data.report.coachNotes} />
+          <CoachNotesCard value={displayData.report.coachNotes} />
 
-          <SprintFocusCard items={data.report.sprintFocus} />
+          <SprintFocusCard items={displayData.report.sprintFocus} />
 
-          <VersionHistoryTimeline events={versionHistory} />
+          <VersionHistoryTimeline events={getVersionHistory(displayData)} />
         </div>
 
         <aside className="col-span-12 lg:col-span-4 space-y-8">
           <AISourcesPanel
-            usedSources={usedSources}
-            missingSources={missingSources}
+            usedSources={getUsedSources(displayData)}
+            missingSources={getMissingSources(displayData)}
           />
 
           <AIConfidencePanel
-            confidence={data.confidence.confidence}
-            missingSources={data.confidence.missingSources}
-            suggestions={data.confidence.suggestions}
-            readiness={data.publishing.readiness}
-            readinessLabel={data.publishing.readinessLabel}
+            confidence={displayData.confidence.confidence}
+            missingSources={displayData.confidence.missingSources}
+            suggestions={displayData.confidence.suggestions}
+            readiness={displayData.publishing.readiness}
+            readinessLabel={displayData.publishing.readinessLabel}
           />
 
           <QuickActionsPanel />
@@ -128,4 +133,71 @@ function ReportWorkspacePage() {
       <BottomActionBar />
     </ReportShell>
   );
+}
+
+function transformAIResponseToWorkspaceData(
+  response: AIResponse,
+  baseData: ReportWorkspaceData
+): ReportWorkspaceData {
+  const summarySections = response.sections.map((section, index) => ({
+    label: section.title,
+    content: section.content,
+  }));
+
+  const strengthsSection = response.sections.find((s) =>
+    s.title.toLowerCase().includes("strength")
+  );
+  const challengesSection = response.sections.find((s) =>
+    s.title.toLowerCase().includes("challenge")
+  );
+
+  const strengths = strengthsSection
+    ? extractListItems(strengthsSection.content)
+    : baseData.report.strengths;
+
+  const challenges = challengesSection
+    ? extractListItems(challengesSection.content)
+    : baseData.report.challenges;
+
+  return {
+    ...baseData,
+    report: {
+      ...baseData.report,
+      summary: summarySections,
+      strengths: strengths,
+      challenges: challenges,
+      metadata: {
+        ...baseData.report.metadata,
+        lastGeneratedAt: response.generatedAt,
+        completionPercent: Math.round(response.confidence * 100),
+      },
+    },
+    confidence: {
+      ...baseData.confidence,
+      confidence: Math.round(response.confidence * 100),
+      missingSources: response.sourcesMissing,
+    },
+  };
+}
+
+function extractListItems(markdown: string): string[] {
+  const lines = markdown.split("\n");
+  const items: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      const content = trimmed.slice(2).trim();
+      if (content) {
+        items.push(content);
+      }
+    } else if (/^\d+\.\s/.test(trimmed)) {
+      const content = trimmed.replace(/^\d+\.\s+/, "").trim();
+      if (content) {
+        items.push(content);
+      }
+    }
+  }
+
+  return items;
 }
