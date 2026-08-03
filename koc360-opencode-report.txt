@@ -348,3 +348,223 @@ The implementation is **production-ready for UI review** but requires backend in
 **Deployed to:** `origin/main`  
 **Total files created:** 13  
 **Total lines added:** 823
+
+---
+
+# Report Engine Architecture Sprint Report
+
+## 1. Files Modified
+
+- `src/routes/report-workspace.tsx` — Refactored to use domain layer; now calls `getReportWorkspaceData()` from `report.server.ts`
+- `src/components/report-workspace/ReportShell.tsx` — Accepts `reportStatus` prop
+- `src/components/report-workspace/ReportSidebar.tsx` — Accepts `reportStatus` prop; removed hardcoded "Draft v2.4"
+- `src/components/report-workspace/ReportHeader.tsx` — Accepts full header model props; removed hardcoded status/labels
+- `src/components/report-workspace/AISourcesPanel.tsx` — Accepts `ReportSource[]` instead of `string[]`
+- `src/components/report-workspace/AIConfidencePanel.tsx` — Accepts structured confidence model props
+- `src/components/report-workspace/VersionHistoryTimeline.tsx` — Accepts mapped events with stable `id` keys
+- `src/components/report-workspace/QuickActionsPanel.tsx` — Accepts actions and regenerate labels as props; removed hardcoded text
+
+## 2. Files Created
+
+- `src/lib/report/report.types.ts` — Complete domain type definitions
+- `src/lib/report/report.server.ts` — Server module with placeholder data, TODO sections, action interfaces, and AI pipeline skeleton
+- `src/lib/report/report.mapper.ts` — Mapper functions to transform domain models for component consumption
+
+## 3. Report Domain Diagram
+
+```
+ReportWorkspaceData
+├── report
+│   ├── id, title
+│   ├── metadata (completionPercent, readingTimeMinutes, lastGeneratedAt, reportStatus, labels)
+│   ├── summary: ReportSummarySection[]
+│   ├── strengths: string[]
+│   ├── challenges: string[]
+│   ├── coachNotes: string
+│   ├── sprintFocus: SprintFocusItem[]
+│   └── versions: ReportVersion[]
+├── student (id, name)
+├── session (id, date)
+├── assessment (id, title)
+├── goals (items[])
+├── sprint (id, name, goal)
+├── tasks (items[])
+├── recommendations (items[])
+├── sources (items: ReportSource[])
+├── confidence: ReportConfidence
+├── publishing (readiness, readinessLabel)
+└── history (versions: ReportVersion[])
+```
+
+## 4. Report Data Flow
+
+```
+Route loader
+    └── createServerFn handler
+            └── getReportWorkspaceData() [report.server.ts]
+                    └── Currently returns placeholder data
+                    └── Future: fetches from Notion databases
+                            └── Returns ReportWorkspaceData
+                                    └── Route component consumes data
+                                            ├── getUsedSources() [report.mapper.ts]
+                                            ├── getMissingSources() [report.mapper.ts]
+                                            ├── getVersionHistory() [report.mapper.ts]
+                                            └── Passes typed props to child components
+```
+
+## 5. Future Notion Queries
+
+| Section | Notion Database | Existing Query Function |
+|---------|----------------|------------------------|
+| Session Notes | Sessions | `fetchSessions()` |
+| Sprint | Sprints | `fetchSprints()` |
+| Assessment | Assessments | `fetchAssessments()` |
+| Goals | Goals | `fetchGoals()` |
+| Tasks | Tasks | `fetchTasks()` |
+| Recommendations | AI Recommendations | `fetchAIRecommendations()` |
+| Student | Students | `getStudentProfileData()` |
+| Coach Notes | Coach Notes (TBD) | To be created |
+| Parent Feedback | Parent Feedback (TBD) | To be created |
+| AI Output | AI Output (TBD) | To be created |
+| Previous Reports | Reports (TBD) | To be created |
+
+## 6. Future AI Pipeline
+
+The AI pipeline will process report generation in 10 stages (documented in `report.server.ts`):
+
+1. **Collect Sources** — Gather all available data from Notion databases
+2. **Normalize Data** — Transform raw Notion data into standardized format
+3. **Generate Prompt** — Construct LLM prompt from normalized data
+4. **Call LLM** — Send prompt to language model
+5. **Validate Output** — Verify schema, check for hallucinations
+6. **Generate Parent Version** — Transform to parent-friendly language
+7. **Generate Student Version** — Transform to student-friendly language
+8. **Generate PDF** — Render report to PDF format
+9. **Save Version** — Store in Notion Reports database
+10. **Publish** — Coach reviews, approves, and publishes
+
+## 7. Placeholder Areas
+
+All placeholder data lives in `src/lib/report/report.server.ts`:
+
+- `getPlaceholderSources()` — 7 report sources (5 available, 2 missing)
+- `getPlaceholderConfidence()` — 88% confidence, 1 missing info, 1 suggestion
+- `getPlaceholderVersions()` — 6 version history events
+- `getPlaceholderReportWorkspaceData()` — Complete domain model with placeholder values
+- `getPlaceholderActions()` — 6 action stubs returning `{ ok: false }`
+
+Student name placeholder: "Student Name" (no longer hardcoded to a specific person).
+
+## 8. Future Backend Integration Points
+
+| Integration Point | Current State | Future State |
+|------------------|---------------|--------------|
+| Data fetching | Placeholder data | Notion API queries |
+| Report actions | Stub functions | Notion mutations + AI pipeline |
+| Sources | Static list | Computed from available data |
+| Confidence | Static 88% | Calculated from source coverage |
+| Versions | Static list | Tracked in Notion Reports DB |
+| Publishing readiness | Static 92% | Calculated from completeness |
+
+## 9. Component → Model Mapping
+
+| Component | Model Type | Props Source |
+|-----------|-----------|-------------|
+| `ReportHeader` | `ReportMetadata` + `student` + `session` + `sprint` | Direct from domain |
+| `AISummaryCard` | `ReportSummarySection[]` | `data.report.summary` |
+| `TagCard` (Strengths) | `string[]` | `data.report.strengths` |
+| `TagCard` (Challenges) | `string[]` | `data.report.challenges` |
+| `CoachNotesCard` | `string` | `data.report.coachNotes` |
+| `SprintFocusCard` | `SprintFocusItem[]` | `data.report.sprintFocus` |
+| `VersionHistoryTimeline` | Mapped `ReportVersion[]` | `getVersionHistory(data)` |
+| `AISourcesPanel` | `ReportSource[]` | `getUsedSources/getMissingSources` |
+| `AIConfidencePanel` | `ReportConfidence` + `publishing` | `data.confidence` + `data.publishing` |
+| `QuickActionsPanel` | Action config | Static defaults (props-driven) |
+| `ReportSidebar` | `ReportStatus` | `data.report.metadata.reportStatus` |
+| `BottomActionBar` | Action handlers | Future: from `getReportActions()` |
+
+## 10. Suggested Report Database Structure
+
+Future Notion database: **Reports**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| Title | title | Report title |
+| Student | relation | Link to Students DB |
+| Session | relation | Link to Sessions DB |
+| Sprint | relation | Link to Sprints DB |
+| Status | select | draft / reviewing / approved / published / archived |
+| Version | number | Incremental version number |
+| Content | rich_text | AI-generated report body |
+| Confidence | number | AI confidence score (0-100) |
+| Readiness | number | Publishing readiness (0-100) |
+| Sources Used | multi_select | List of source types used |
+| Coach Notes | rich_text | Private coach observations |
+| Parent Version | rich_text | Parent-friendly version |
+| Student Version | rich_text | Student-friendly version |
+| PDF URL | url | Generated PDF file URL |
+| Share Link | url | Secure share link |
+| Last Generated | date | Timestamp of last AI generation |
+| Published At | date | Publication timestamp |
+| Created By | people | Author/coach |
+
+## 11. Technical Debt
+
+- All data is placeholder; no real backend integration
+- Action functions return `{ ok: false }` — not connected
+- AI pipeline is documented but not implemented
+- No error handling for data fetching failures
+- No loading states for async operations
+- Report database does not exist in Notion yet
+- Coach Notes, Parent Feedback, AI Output databases do not exist yet
+- No authentication/authorization for report actions
+- No caching strategy for report data
+- No optimistic updates for report mutations
+
+## 12. Next Recommended Sprint
+
+**Sprint: Notion Integration for Report Data**
+
+1. Create Reports database in Notion with the structure above
+2. Implement `fetchReports()` in `queries.server.ts`
+3. Replace `getPlaceholderReportWorkspaceData()` with real Notion queries
+4. Wire up student, session, sprint relations
+5. Compute source availability from actual data
+6. Calculate confidence score from source coverage
+7. Implement `saveDraft()` action to persist to Notion
+
+## 13. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: modules transformed
+✓ SSR build: 127 modules transformed
+✓ Nitro build: 298 modules transformed
+```
+
+No build errors or warnings.
+
+## 14. git status
+
+```
+?? design/
+```
+
+Only the `design/` directory (original HTML design file) remains untracked. All implementation files are committed.
+
+## 15. Latest Commit Hash
+
+**Commit:** `9436208`  
+**Message:** `Implement Report Engine domain architecture`  
+**Branch:** `main`  
+**Files changed:** 11 files (+779 lines, -190 lines)
+
+## 16. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   e4de588..9436208  main -> main
+```
