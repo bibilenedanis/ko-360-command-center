@@ -349,48 +349,59 @@ export function buildDataAvailabilitySection(context: ReportContext): string {
 export function buildOutputSection(): string {
   return `OUTPUT INSTRUCTIONS:
 
-Generate a comprehensive coaching report with the following sections:
+Return ONLY valid JSON.
 
-1. EXECUTIVE SUMMARY
-   - Brief overview of the session
-   - Key highlights and main takeaways
-   - Overall student trajectory
+Do not wrap inside markdown.
+Do not explain.
+Do not add extra text.
+Do not use code fences.
+Do not include any text before or after the JSON object.
 
-2. STRENGTHS & PROGRESS
-   - Specific achievements and wins
-   - Skills demonstrated
-   - Positive patterns observed
-   - Evidence-based observations
+Output MUST match this schema exactly:
 
-3. CHALLENGES & AREAS FOR GROWTH
-   - Specific obstacles encountered
-   - Patterns that need attention
-   - Root causes (if evident from data)
-   - Impact on progress
+{
+  "summary": {
+    "currentStatus": "One-sentence summary of the student's current standing",
+    "keyInsight": "The single most important observation from available data",
+    "recommendedFocus": "What the student should prioritize next"
+  },
+  "strengths": [
+    "Evidence-based strength, grounded in provided data",
+    "Another strength"
+  ],
+  "challenges": [
+    "Evidence-based challenge, grounded in provided data",
+    "Another challenge"
+  ],
+  "coachNotes": "Private observations for the coach, candid and actionable",
+  "nextSprintFocus": [
+    {
+      "title": "Short label for the focus area",
+      "description": "What to do and why"
+    }
+  ],
+  "confidence": {
+    "score": 0.85,
+    "missingInformation": [
+      "What data was missing"
+    ],
+    "suggestions": [
+      "What to do to improve confidence"
+    ]
+  }
+}
 
-4. SESSION INSIGHTS
-   - Key observations from the session
-   - Behavioral patterns
-   - Engagement level
-   - Connection to goals
+FIELD REQUIREMENTS:
+- summary.currentStatus: string, 1-3 sentences describing the student's current standing
+- summary.keyInsight: string, 1-2 sentences with the most important observation
+- summary.recommendedFocus: string, 1-2 sentences on what to prioritize next
+- strengths: array of 2-6 strings, each evidence-based and grounded in provided data
+- challenges: array of 2-6 strings, each evidence-based and grounded in provided data
+- coachNotes: string, 1-4 sentences of private observations for the coach
+- nextSprintFocus: array of 1-4 objects, each with "title" (short label) and "description" (what to do and why)
+- confidence.score: number between 0 and 1 reflecting how confident the analysis is
+- confidence.missingInformation: array of strings listing what data was not available
+- confidence.suggestions: array of strings with actionable suggestions to improve confidence
 
-5. RECOMMENDATIONS
-   - Specific, actionable next steps
-   - Short-term priorities (next 1-2 weeks)
-   - Medium-term focus (current sprint)
-   - Resources or support needed
-
-6. COMMITMENTS & FOLLOW-UP
-   - What the student committed to
-   - Follow-up actions for the coach
-   - Check-in points
-   - Success metrics
-
-FORMATTING RULES:
-- Use clear, professional language
-- Be specific and evidence-based
-- Use bullet points for lists
-- Keep paragraphs concise (3-4 sentences max)
-- Use headings and subheadings for structure
-- Total length: 800-1200 words`;
+CRITICAL: Your entire response must be a single valid JSON object. Nothing else.`;
 }

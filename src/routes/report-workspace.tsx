@@ -20,8 +20,9 @@ import {
   getVersionHistory,
 } from "@/lib/report/report.mapper";
 import type { ReportWorkspaceData } from "@/lib/report/report.types";
-import { generateReportPrompt } from "@/lib/report/generate.server";
-import type { AIResponse } from "@/lib/ai/response.types";
+import { generateReportOutput, ValidationError } from "@/lib/report/generate.server";
+import type { ReportOutput } from "@/lib/ai/schema";
+import { mapReportOutputToWorkspaceData } from "@/lib/report/report-output.mapper";
 
 const loadReportWorkspace = createServerFn({ method: "GET" }).handler(
   async (): Promise<ReportWorkspaceData> => {
@@ -48,7 +49,8 @@ export const Route = createFileRoute("/report-workspace")({
 function ReportWorkspacePage() {
   const data = Route.useLoaderData() as ReportWorkspaceData;
   const [isGenerating, setIsGenerating] = useState(false);
-  const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
+  const [reportOutput, setReportOutput] = useState<ReportOutput | null>(null);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const usedSources = getUsedSources(data);
   const missingSources = getMissingSources(data);
   const versionHistory = getVersionHistory(data);
@@ -56,18 +58,27 @@ function ReportWorkspacePage() {
   const handleGenerateAgain = async () => {
     setIsGenerating(true);
     try {
-      const response = await generateReportPrompt({ data: { sessionId: data.session.id } });
-      setAiResponse(response);
+      const output = await generateReportOutput({ data: { sessionId: data.session.id } });
+      setReportOutput(output);
+      setGeneratedAt(new Date().toISOString());
       toast.success("Report generated successfully.");
     } catch (error) {
       console.error("Failed to generate report:", error);
-      toast.error("Report generation failed.");
+      if (error instanceof ValidationError) {
+        toast.error("Report validation failed: " + error.errors.join(", "));
+      } else if (error instanceof Error) {
+        toast.error("Report generation failed: " + error.message);
+      } else {
+        toast.error("Report generation failed.");
+      }
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const displayData = aiResponse ? transformAIResponseToWorkspaceData(aiResponse, data) : data;
+  const displayData = reportOutput
+    ? mapReportOutputToWorkspaceData(reportOutput, data, generatedAt || undefined)
+    : data;
 
   return (
     <ReportShell reportStatus={displayData.report.metadata.reportStatus}>
@@ -133,71 +144,4 @@ function ReportWorkspacePage() {
       <BottomActionBar />
     </ReportShell>
   );
-}
-
-function transformAIResponseToWorkspaceData(
-  response: AIResponse,
-  baseData: ReportWorkspaceData
-): ReportWorkspaceData {
-  const summarySections = response.sections.map((section, index) => ({
-    label: section.title,
-    content: section.content,
-  }));
-
-  const strengthsSection = response.sections.find((s) =>
-    s.title.toLowerCase().includes("strength")
-  );
-  const challengesSection = response.sections.find((s) =>
-    s.title.toLowerCase().includes("challenge")
-  );
-
-  const strengths = strengthsSection
-    ? extractListItems(strengthsSection.content)
-    : baseData.report.strengths;
-
-  const challenges = challengesSection
-    ? extractListItems(challengesSection.content)
-    : baseData.report.challenges;
-
-  return {
-    ...baseData,
-    report: {
-      ...baseData.report,
-      summary: summarySections,
-      strengths: strengths,
-      challenges: challenges,
-      metadata: {
-        ...baseData.report.metadata,
-        lastGeneratedAt: response.generatedAt,
-        completionPercent: Math.round(response.confidence * 100),
-      },
-    },
-    confidence: {
-      ...baseData.confidence,
-      confidence: Math.round(response.confidence * 100),
-      missingSources: response.sourcesMissing,
-    },
-  };
-}
-
-function extractListItems(markdown: string): string[] {
-  const lines = markdown.split("\n");
-  const items: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-      const content = trimmed.slice(2).trim();
-      if (content) {
-        items.push(content);
-      }
-    } else if (/^\d+\.\s/.test(trimmed)) {
-      const content = trimmed.replace(/^\d+\.\s+/, "").trim();
-      if (content) {
-        items.push(content);
-      }
-    }
-  }
-
-  return items;
 }

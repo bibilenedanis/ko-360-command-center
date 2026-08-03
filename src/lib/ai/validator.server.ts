@@ -1,166 +1,190 @@
-import type { AIResponse, AIResponseSection } from "./response.types";
+import type {
+  ReportOutput,
+  ReportOutputSummary,
+  ReportOutputConfidence,
+  ReportOutputNextSprintFocusItem,
+} from "./schema";
 import type { PromptOutput } from "@/lib/report/prompt.types";
 
 export class ValidationError extends Error {
   constructor(
     message: string,
-    public readonly errors: string[]
+    public readonly errors: string[],
   ) {
     super(message);
     this.name = "ValidationError";
   }
 }
 
-export function validateAndParseResponse(
-  output: PromptOutput,
-  sessionId: string,
-  studentId: string
-): AIResponse {
+export function validateReportOutput(output: PromptOutput): ReportOutput {
   const errors: string[] = [];
   const text = output.text.trim();
 
-  if (!text || text.length < 100) {
-    errors.push("Response is too short or empty");
+  if (!text) {
+    throw new ValidationError("Response is empty", ["Response is empty"]);
   }
 
-  const { metadata, content } = extractMetadata(text);
-  
-  if (!metadata) {
-    errors.push("Could not parse JSON metadata from response");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    throw new ValidationError("Response is not valid JSON", [
+      "Response could not be parsed as JSON",
+    ]);
   }
 
-  const sections = parseMarkdownSections(content || text);
-  
-  if (sections.length === 0) {
-    errors.push("No markdown sections found in response");
+  if (!parsed || typeof parsed !== "object") {
+    throw new ValidationError("Response is not a JSON object", [
+      "Response must be a JSON object",
+    ]);
   }
+
+  const obj = parsed as Record<string, unknown>;
+
+  const summary = validateSummary(obj.summary, errors);
+  const strengths = validateStringArray(obj.strengths, "strengths", errors);
+  const challenges = validateStringArray(obj.challenges, "challenges", errors);
+  const coachNotes = validateString(obj.coachNotes, "coachNotes", errors);
+  const nextSprintFocus = validateNextSprintFocus(
+    obj.nextSprintFocus,
+    errors,
+  );
+  const confidence = validateConfidence(obj.confidence, errors);
 
   if (errors.length > 0) {
     throw new ValidationError(
       `Response validation failed with ${errors.length} error(s)`,
-      errors
+      errors,
     );
   }
 
-  const wordCount = (content || text).split(/\s+/).length;
-  
   return {
-    reportType: metadata?.reportType || "session",
-    studentId: metadata?.studentId || studentId,
-    sessionId: metadata?.sessionId || sessionId,
-    generatedAt: metadata?.generatedAt || new Date().toISOString(),
-    confidence: metadata?.confidence || 0.8,
-    sourcesUsed: metadata?.sourcesUsed || [],
-    sourcesMissing: metadata?.sourcesMissing || [],
-    wordCount: metadata?.wordCount || wordCount,
-    sections: sections,
-    rawMarkdown: content || text,
-    metadata: {
-      providerName: output.model.split("/")[0] || "unknown",
-      model: output.model,
-      promptTokens: output.promptTokens,
-      completionTokens: output.completionTokens,
-      totalTokens: output.totalTokens,
-      validationPassed: true,
-      validationErrors: [],
-      validatedAt: new Date().toISOString(),
-    },
+    summary,
+    strengths,
+    challenges,
+    coachNotes,
+    nextSprintFocus,
+    confidence,
   };
 }
 
-function extractMetadata(text: string): {
-  metadata: Partial<AIResponse> | null;
-  content: string | null;
-} {
-  const jsonBlockMatch = text.match(/```json\s*\n([\s\S]*?)\n```/);
-  
-  if (jsonBlockMatch && jsonBlockMatch[1]) {
-    try {
-      const metadata = JSON.parse(jsonBlockMatch[1]);
-      const content = text.slice(jsonBlockMatch[0].length).trim();
-      return { metadata, content };
-    } catch (e) {
-      console.error("Failed to parse JSON metadata:", e);
-    }
+function validateSummary(
+  value: unknown,
+  errors: string[],
+): ReportOutputSummary {
+  if (!value || typeof value !== "object") {
+    errors.push("summary is missing or not an object");
+    return { currentStatus: "", keyInsight: "", recommendedFocus: "" };
   }
 
-  const lines = text.split("\n");
-  let jsonStart = -1;
-  let jsonEnd = -1;
-  let braceCount = 0;
-  let inJson = false;
+  const obj = value as Record<string, unknown>;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    
-    if (line.trim().startsWith("{") && !inJson) {
-      jsonStart = i;
-      inJson = true;
-    }
-    
-    if (inJson) {
-      for (const char of line) {
-        if (char === "{") braceCount++;
-        if (char === "}") braceCount--;
-      }
-      
-      if (braceCount === 0 && jsonStart !== -1) {
-        jsonEnd = i;
-        break;
-      }
-    }
-  }
+  const currentStatus = validateString(obj.currentStatus, "summary.currentStatus", errors);
+  const keyInsight = validateString(obj.keyInsight, "summary.keyInsight", errors);
+  const recommendedFocus = validateString(obj.recommendedFocus, "summary.recommendedFocus", errors);
 
-  if (jsonStart !== -1 && jsonEnd !== -1) {
-    const jsonText = lines.slice(jsonStart, jsonEnd + 1).join("\n");
-    try {
-      const metadata = JSON.parse(jsonText);
-      const contentLines = [
-        ...lines.slice(0, jsonStart),
-        ...lines.slice(jsonEnd + 1)
-      ];
-      const content = contentLines.join("\n").trim();
-      return { metadata, content };
-    } catch (e) {
-      console.error("Failed to parse JSON metadata:", e);
-    }
-  }
-
-  return { metadata: null, content: null };
+  return { currentStatus, keyInsight, recommendedFocus };
 }
 
-function parseMarkdownSections(markdown: string): AIResponseSection[] {
-  const sections: AIResponseSection[] = [];
-  const headingRegex = /^##\s+(.+)$/gm;
-  
-  const matches: Array<{ heading: string; index: number; level: number }> = [];
-  let match;
-  
-  while ((match = headingRegex.exec(markdown)) !== null) {
-    const level = match[0].match(/^#+/)?.[0].length || 2;
-    matches.push({
-      heading: match[1].trim(),
-      index: match.index,
-      level,
-    });
+function validateStringArray(
+  value: unknown,
+  fieldName: string,
+  errors: string[],
+): string[] {
+  if (!Array.isArray(value)) {
+    errors.push(`${fieldName} is missing or not an array`);
+    return [];
   }
 
-  for (let i = 0; i < matches.length; i++) {
-    const current = matches[i];
-    const next = matches[i + 1];
-    
-    const contentStart = current.index + markdown.slice(current.index).indexOf("\n") + 1;
-    const contentEnd = next ? next.index : markdown.length;
-    
-    const content = markdown.slice(contentStart, contentEnd).trim();
-    
-    sections.push({
-      id: `section-${i}`,
-      title: current.heading,
-      content: content,
-      order: i,
-    });
+  const result: string[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (typeof item !== "string" || !item.trim()) {
+      errors.push(`${fieldName}[${i}] must be a non-empty string`);
+    } else {
+      result.push(item.trim());
+    }
   }
 
-  return sections;
+  return result;
+}
+
+function validateString(
+  value: unknown,
+  fieldName: string,
+  errors: string[],
+): string {
+  if (typeof value !== "string" || !value.trim()) {
+    errors.push(`${fieldName} is missing or not a non-empty string`);
+    return "";
+  }
+  return value.trim();
+}
+
+function validateNextSprintFocus(
+  value: unknown,
+  errors: string[],
+): ReportOutputNextSprintFocusItem[] {
+  if (!Array.isArray(value)) {
+    errors.push("nextSprintFocus is missing or not an array");
+    return [];
+  }
+
+  const result: ReportOutputNextSprintFocusItem[] = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (!item || typeof item !== "object") {
+      errors.push(`nextSprintFocus[${i}] must be an object`);
+      continue;
+    }
+
+    const obj = item as Record<string, unknown>;
+    const title = typeof obj.title === "string" && obj.title.trim() ? obj.title.trim() : null;
+    const description = typeof obj.description === "string" && obj.description.trim() ? obj.description.trim() : null;
+
+    if (!title) {
+      errors.push(`nextSprintFocus[${i}].title must be a non-empty string`);
+    }
+    if (!description) {
+      errors.push(`nextSprintFocus[${i}].description must be a non-empty string`);
+    }
+
+    if (title && description) {
+      result.push({ title, description });
+    }
+  }
+
+  return result;
+}
+
+function validateConfidence(
+  value: unknown,
+  errors: string[],
+): ReportOutputConfidence {
+  if (!value || typeof value !== "object") {
+    errors.push("confidence is missing or not an object");
+    return { score: 0, missingInformation: [], suggestions: [] };
+  }
+
+  const obj = value as Record<string, unknown>;
+
+  let score = 0;
+  if (typeof obj.score !== "number" || obj.score < 0 || obj.score > 1) {
+    errors.push("confidence.score must be a number between 0 and 1");
+  } else {
+    score = obj.score;
+  }
+
+  const missingInformation = validateStringArray(
+    obj.missingInformation,
+    "confidence.missingInformation",
+    errors,
+  );
+  const suggestions = validateStringArray(
+    obj.suggestions,
+    "confidence.suggestions",
+    errors,
+  );
+
+  return { score, missingInformation, suggestions };
 }

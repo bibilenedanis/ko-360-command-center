@@ -116,31 +116,59 @@ AVOID:
  */
 export const OUTPUT_FORMAT = `OUTPUT FORMAT:
 
-Generate a comprehensive coaching report with the following sections:
+Return ONLY valid JSON.
 
-## 1. EXECUTIVE SUMMARY
-Brief overview of the session, key highlights, and overall trajectory.
+Do not wrap inside markdown.
+Do not explain.
+Do not add extra text.
+Do not use code fences.
+Do not include any text before or after the JSON object.
 
-## 2. STRENGTHS & PROGRESS
-Specific achievements, skills demonstrated, and positive patterns.
+Output MUST match this schema exactly:
 
-## 3. CHALLENGES & AREAS FOR GROWTH
-Obstacles encountered, patterns needing attention, and impact on progress.
+{
+  "summary": {
+    "currentStatus": "One-sentence summary of the student's current standing",
+    "keyInsight": "The single most important observation from available data",
+    "recommendedFocus": "What the student should prioritize next"
+  },
+  "strengths": [
+    "Evidence-based strength, grounded in provided data",
+    "Another strength"
+  ],
+  "challenges": [
+    "Evidence-based challenge, grounded in provided data",
+    "Another challenge"
+  ],
+  "coachNotes": "Private observations for the coach, candid and actionable",
+  "nextSprintFocus": [
+    {
+      "title": "Short label for the focus area",
+      "description": "What to do and why"
+    }
+  ],
+  "confidence": {
+    "score": 0.85,
+    "missingInformation": [
+      "What data was missing"
+    ],
+    "suggestions": [
+      "What to do to improve confidence"
+    ]
+  }
+}
 
-## 4. SESSION INSIGHTS
-Key observations, behavioral patterns, and engagement level.
-
-## 5. RECOMMENDATIONS
-Specific, actionable next steps organized by timeframe:
-- Short-term (next 1-2 weeks)
-- Medium-term (current sprint)
-- Resources or support needed
-
-## 6. COMMITMENTS & FOLLOW-UP
-Student commitments, coach follow-up actions, and success metrics.
-
-LENGTH: 800-1200 words
-FORMAT: Markdown with clear headings`;
+FIELD REQUIREMENTS:
+- summary.currentStatus: string, 1-3 sentences
+- summary.keyInsight: string, 1-2 sentences
+- summary.recommendedFocus: string, 1-2 sentences
+- strengths: array of 2-6 strings
+- challenges: array of 2-6 strings
+- coachNotes: string, 1-4 sentences
+- nextSprintFocus: array of 1-4 objects with title and description
+- confidence.score: number between 0 and 1
+- confidence.missingInformation: array of strings
+- confidence.suggestions: array of strings`;
 
 /**
  * General rules for prompt generation.

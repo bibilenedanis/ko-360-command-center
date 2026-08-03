@@ -1,5 +1,6 @@
 import type { LLMProvider, LLMProviderConfig } from "./provider.types";
 import type { PromptDocument, PromptOutput } from "@/lib/report/prompt.types";
+import { ValidationError } from "./validator.server";
 
 const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 
@@ -15,8 +16,6 @@ export class NvidiaProvider implements LLMProvider {
   }
 
   async generate(promptDocument: PromptDocument): Promise<PromptOutput> {
-    const startTime = Date.now();
-
     const response = await fetch(NVIDIA_API_URL, {
       method: "POST",
       headers: {
@@ -37,26 +36,36 @@ export class NvidiaProvider implements LLMProvider {
         ],
         temperature: 0.7,
         max_tokens: 4000,
+        response_format: { type: "json_object" },
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `NVIDIA API request failed: ${response.status} ${response.statusText}\n${errorText}`
+        `NVIDIA API request failed: ${response.status} ${response.statusText}\n${errorText}`,
       );
     }
 
     const data = await response.json();
-    const duration = Date.now() - startTime;
 
     const choice = data.choices?.[0];
     if (!choice?.message?.content) {
       throw new Error("NVIDIA API returned empty response");
     }
 
+    const text = choice.message.content;
+
+    try {
+      JSON.parse(text);
+    } catch (e) {
+      throw new ValidationError("LLM response is not valid JSON", [
+        "Response could not be parsed as JSON",
+      ]);
+    }
+
     return {
-      text: choice.message.content,
+      text,
       model: this.config.model,
       generatedAt: new Date().toISOString(),
       promptTokens: data.usage?.prompt_tokens,
@@ -73,7 +82,7 @@ export class NvidiaProvider implements LLMProvider {
           headers: {
             Authorization: `Bearer ${this.config.apiKey}`,
           },
-        }
+        },
       );
       return response.ok;
     } catch {
