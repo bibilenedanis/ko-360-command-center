@@ -1,9 +1,9 @@
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
+import type { ReportSource } from "@/lib/report/report.types";
 
 interface AISourcesPanelProps {
-  usedSources: string[];
-  missingSources: string[];
+  usedSources: ReportSource[];
+  missingSources: ReportSource[];
 }
 
 export function AISourcesPanel({ usedSources, missingSources }: AISourcesPanelProps) {
@@ -19,13 +19,13 @@ export function AISourcesPanel({ usedSources, missingSources }: AISourcesPanelPr
             Used Sources
           </p>
           <div className="space-y-1">
-            {usedSources.map((source, index) => (
-              <div key={index} className="flex items-center gap-2 text-xs">
+            {usedSources.map((source) => (
+              <div key={source.id} className="flex items-center gap-2 text-xs">
                 <Icon
                   name="check_box"
                   className="text-sm text-primary"
                 />
-                {source}
+                {source.title}
               </div>
             ))}
           </div>
@@ -35,13 +35,13 @@ export function AISourcesPanel({ usedSources, missingSources }: AISourcesPanelPr
             Missing Data
           </p>
           <div className="space-y-1">
-            {missingSources.map((source, index) => (
+            {missingSources.map((source) => (
               <div
-                key={index}
+                key={source.id}
                 className="flex items-center gap-2 text-xs text-on-surface-variant"
               >
                 <Icon name="check_box_outline_blank" className="text-sm" />
-                {source}
+                {source.title}
               </div>
             ))}
           </div>

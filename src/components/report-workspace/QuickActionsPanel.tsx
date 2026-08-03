@@ -7,10 +7,39 @@ interface QuickAction {
 }
 
 interface QuickActionsPanelProps {
-  actions: QuickAction[];
+  actions?: QuickAction[];
+  regenerateLabel?: string;
+  regenerateDescription?: string;
 }
 
-export function QuickActionsPanel({ actions }: QuickActionsPanelProps) {
+const defaultActions: QuickAction[] = [
+  {
+    icon: "picture_as_pdf",
+    title: "Export PDF",
+    description: "Create printable version",
+  },
+  {
+    icon: "family_restroom",
+    title: "Parent Version",
+    description: "Hide coach-only notes",
+  },
+  {
+    icon: "person",
+    title: "Student Version",
+    description: "Student-friendly wording",
+  },
+  {
+    icon: "share",
+    title: "Share Report",
+    description: "Generate secure share link",
+  },
+];
+
+export function QuickActionsPanel({
+  actions = defaultActions,
+  regenerateLabel = "Regenerate AI",
+  regenerateDescription = "Create a new AI draft using updated data",
+}: QuickActionsPanelProps) {
   return (
     <div className="bg-surface border border-outline-variant p-6">
       <h3 className="text-xs font-mono font-bold uppercase text-on-surface-variant mb-4">
@@ -41,10 +70,10 @@ export function QuickActionsPanel({ actions }: QuickActionsPanelProps) {
         >
           <div className="flex items-center gap-2 text-[11px] font-mono uppercase">
             <Icon name="refresh" className="text-sm" />
-            Regenerate AI
+            {regenerateLabel}
           </div>
           <p className="text-[11px] font-mono lowercase opacity-70">
-            Create a new AI draft using updated data
+            {regenerateDescription}
           </p>
         </button>
       </div>

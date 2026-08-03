@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
 
 interface VersionEvent {
+  id: string;
   title: string;
   timestamp: string;
   actor: string;
-  isLatest?: boolean;
+  isLatest: boolean;
 }
 
 interface VersionHistoryTimelineProps {
@@ -18,8 +19,8 @@ export function VersionHistoryTimeline({ events }: VersionHistoryTimelineProps) 
         Version History
       </h3>
       <div className="relative pl-8 border-l border-outline-variant space-y-8">
-        {events.map((event, index) => (
-          <div key={index} className="relative">
+        {events.map((event) => (
+          <div key={event.id} className="relative">
             <div
               className={cn(
                 "absolute -left-[37px] top-1 w-4 h-4 rounded-full border-4 border-background",

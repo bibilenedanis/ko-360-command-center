@@ -1,5 +1,6 @@
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import type { ReportStatus } from "@/lib/report/report.types";
 
 const sections = [
   { key: "sources", label: "AI Sources", icon: "source" },
@@ -13,16 +14,20 @@ type SectionKey = (typeof sections)[number]["key"];
 
 interface ReportSidebarProps {
   activeSection?: SectionKey;
+  reportStatus?: ReportStatus;
 }
 
-export function ReportSidebar({ activeSection = "sources" }: ReportSidebarProps) {
+export function ReportSidebar({
+  activeSection = "sources",
+  reportStatus = "draft",
+}: ReportSidebarProps) {
   return (
     <aside className="hidden md:flex flex-col fixed left-0 top-16 bottom-0 w-64 bg-surface-container-low border-r border-outline-variant z-20">
       <div className="p-6">
         <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-primary mb-1">
           Report Workspace
         </h2>
-        <p className="text-xs text-on-surface-variant">Draft v2.4</p>
+        <p className="text-xs text-on-surface-variant capitalize">{reportStatus}</p>
       </div>
 
       <nav className="flex-1 flex flex-col">

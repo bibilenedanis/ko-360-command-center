@@ -1,22 +1,31 @@
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/icon";
+import type { ReportStatus } from "@/lib/report/report.types";
 
 interface ReportHeaderProps {
   studentName: string;
   sessionDate: string;
-  sprint: string;
+  sprintName: string;
   goal: string;
   completionPercent: number;
   readingTimeMinutes: number;
+  lastGeneratedAt: string;
+  reportStatus: ReportStatus;
+  draftLabel: string;
+  reviewLabel: string;
 }
 
 export function ReportHeader({
   studentName,
   sessionDate,
-  sprint,
+  sprintName,
   goal,
   completionPercent,
   readingTimeMinutes,
+  lastGeneratedAt,
+  reportStatus,
+  draftLabel,
+  reviewLabel,
 }: ReportHeaderProps) {
   return (
     <section className="bg-surface border-b border-outline-variant p-6 sticky top-16 z-10">
@@ -33,8 +42,8 @@ export function ReportHeader({
             <h1 className="text-2xl font-bold tracking-tight text-primary">
               {studentName}
             </h1>
-            <span className="px-2 py-0.5 border border-primary text-[11px] font-mono uppercase">
-              Reviewing
+            <span className="px-2 py-0.5 border border-primary text-[11px] font-mono uppercase capitalize">
+              {reportStatus}
             </span>
           </div>
           <p className="text-xs text-on-surface-variant mb-4">
@@ -45,7 +54,7 @@ export function ReportHeader({
               <span className="font-bold">Session Date:</span> {sessionDate}
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-bold">Sprint:</span> {sprint}
+              <span className="font-bold">Sprint:</span> {sprintName}
             </div>
             <div className="flex items-center gap-1">
               <span className="font-bold">Goal:</span> {goal}
@@ -60,17 +69,17 @@ export function ReportHeader({
             </span>
             <div className="flex gap-1">
               <span className="px-1.5 py-0.5 bg-surface-variant text-on-surface-variant text-[11px] font-mono rounded">
-                Draft
+                {draftLabel}
               </span>
               <span className="px-1.5 py-0.5 bg-primary text-on-primary text-[11px] font-mono rounded">
-                Reviewing
+                {reviewLabel}
               </span>
             </div>
           </div>
           <div className="flex justify-between items-center gap-4">
             <div className="text-xs">
               <p className="text-on-surface-variant">Last Generated:</p>
-              <p className="font-bold">24 Oct, 14:35</p>
+              <p className="font-bold">{lastGeneratedAt}</p>
             </div>
             <button
               type="button"
