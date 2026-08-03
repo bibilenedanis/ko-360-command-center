@@ -1,5 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { Icon } from "@/components/icon";
 import { SessionHeader } from "@/components/session-workspace/SessionHeader";
@@ -15,6 +17,10 @@ import {
   updateSessionNotes,
   type SessionWorkspaceResult,
 } from "@/lib/sessions/workspace.server";
+import { generateSessionBrief, SessionBriefValidationError } from "@/lib/sessions/generate.server";
+import { getLatestSessionBrief } from "@/lib/sessions/repository.server";
+import type { SessionBriefRecord } from "@/lib/sessions/repository.server";
+import { mapSessionBriefToDisplayData } from "@/lib/sessions/mapper";
 
 const loadSessionWorkspace = createServerFn({ method: "GET" })
   .validator((data: unknown) => {
@@ -24,7 +30,11 @@ const loadSessionWorkspace = createServerFn({ method: "GET" })
     return data as { sessionId: string };
   })
   .handler(async ({ data }) => {
-    return await getSessionWorkspaceData(data.sessionId);
+    const result = await getSessionWorkspaceData(data.sessionId);
+    if (!result.ok) return result;
+
+    const latestBrief = await getLatestSessionBrief(data.sessionId);
+    return { ok: true as const, data: result.data, latestBrief };
   });
 
 const saveSessionNotes = createServerFn({ method: "POST" })
@@ -74,8 +84,12 @@ export const Route = createFileRoute("/sessions_/$sessionId")({
   component: SessionWorkspacePage,
 });
 
+type SessionLoaderData =
+  | { ok: true; data: SessionWorkspaceResult extends { ok: true; data: infer D } ? D : never; latestBrief: SessionBriefRecord | null }
+  | { ok: false; reason: string; message: string };
+
 function SessionWorkspacePage() {
-  const result = Route.useLoaderData() as SessionWorkspaceResult;
+  const result = Route.useLoaderData() as SessionLoaderData;
 
   if (!result.ok) {
     return (
@@ -87,6 +101,35 @@ function SessionWorkspacePage() {
 
   const { session, profile, context } = result.data;
   const { student, summary } = profile;
+
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentBrief, setCurrentBrief] = useState<SessionBriefRecord | null>(result.latestBrief);
+
+  const handleGenerateBrief = async () => {
+    setIsGenerating(true);
+    try {
+      const briefRecord = await generateSessionBrief({
+        data: { sessionId: session.id },
+      });
+      setCurrentBrief(briefRecord);
+      toast.success("Session brief generated successfully.");
+    } catch (error) {
+      console.error("Failed to generate session brief:", error);
+      if (error instanceof SessionBriefValidationError) {
+        toast.error("Brief validation failed: " + error.errors.join(", "));
+      } else if (error instanceof Error) {
+        toast.error("Brief generation failed: " + error.message);
+      } else {
+        toast.error("Brief generation failed.");
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const briefDisplayData = currentBrief
+    ? mapSessionBriefToDisplayData(currentBrief.brief, currentBrief.createdAt)
+    : null;
 
   return (
     <AppShell>
@@ -104,7 +147,12 @@ function SessionWorkspacePage() {
 
         <CoachingFlowStrip activeStep="session" />
 
-        <AIBriefingPanel data={result.data} />
+        <AIBriefingPanel
+          data={result.data}
+          briefData={briefDisplayData}
+          isGenerating={isGenerating}
+          onGenerateBrief={handleGenerateBrief}
+        />
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-12">
           {/* Left: Notes (~45%) */}
@@ -148,7 +196,7 @@ function UnavailableState({
   reason,
   message,
 }: {
-  reason: "session_not_found" | "student_missing" | "load_failed";
+  reason: string;
   message: string;
 }) {
   const title =
