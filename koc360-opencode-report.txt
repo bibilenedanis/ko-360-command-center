@@ -1136,3 +1136,226 @@ Implemented the Prompt Builder layer for the Koç360 AI Engine. This layer:
 **Total files created:** 4  
 **Total files modified:** 1  
 **Total lines added:** 1,720
+
+---
+
+# AI Design Specification — Documentation Sprint Report
+
+## 1. Files Created
+
+- `docs/AI_Design_Specification.md` — Comprehensive technical specification for all AI features in Koç360 (1,319 lines)
+
+## 2. Files Modified
+
+**None.** This sprint was documentation-only. No code, routes, components, or existing files were modified.
+
+## 3. AI Architecture Summary
+
+The AI Design Specification establishes the foundational architecture for all AI features in Koç360. It is organized into 11 major sections:
+
+### 3.1 AI Vision
+Defines AI as a **supporting actor** — it assists coaches by aggregating data, recognizing patterns, drafting reports, and surfacing risks, but **never decides, publishes, or modifies authoritative records** without explicit human action.
+
+### 3.2 AI Principles (12 Non-Negotiable Rules)
+1. Evidence-Based
+2. Coach, Not Teacher
+3. Coach, Not Psychologist
+4. Never Hallucinate
+5. Never Diagnose
+6. Never Shame
+7. Never Invent Missing Information
+8. Explain Uncertainty
+9. Encourage Growth Mindset
+10. Privacy and Permission Scope
+11. Auditability
+12. Human-in-the-Loop
+
+### 3.3 AI Personas (7 Roles)
+| Persona | Context | Responsibility |
+|---------|---------|----------------|
+| Session Coach | Session Workspace | Session briefings, note summaries, risk surfacing |
+| Report Writer | Report Builder/Workspace | Report drafting, gap detection, quality suggestions |
+| Sprint Advisor | Sprint Workspace | Sprint progress, task prioritization, risk flagging |
+| Goal Reviewer | Goal Workspace | Goal progress analysis, priority recommendations |
+| Parent Communication Assistant | Report Workspace | Parent-friendly report drafting |
+| Command Center Briefing | Command Center | Daily prioritization and attention signals |
+| Risk Analyst | Student 360, Command Center | Risk signal detection and trend analysis |
+
+### 3.4 Report Generation Pipeline (9 Stages)
+```
+Collect Sources → Validate Sources → Normalize Data → Build Context → Build Prompt → Call LLM → Validate Output → Human Review → Publish
+```
+
+### 3.5 Prompt Architecture (7 Sections)
+1. System Message (identity, mission, constraints)
+2. Role Definition (persona, task)
+3. Context (data from ReportContext)
+4. Rules (AI Principles enforcement)
+5. Output Instructions (format, structure, length, style)
+6. Safety Rules (critical boundaries reinforcement)
+7. Examples (optional, few-shot)
+
+### 3.6 Output Strategy
+**Decision:** Structured Markdown with JSON Metadata
+- Human-readable Markdown for coach editing
+- JSON metadata for validation and audit
+- Justified by: coach-friendliness + machine-parseability
+
+### 3.7 Validation Layer (5 Stages)
+1. Schema Validation
+2. Grounding Check (hallucination detection)
+3. Safety Check (prohibited language scan)
+4. Quality Check (tone, length, structure)
+5. Confidence Scoring
+
+### 3.8 Missing Data Strategy
+- Never invent missing data
+- Explicitly state "Insufficient evidence to determine [X]"
+- Adjust confidence score based on data availability
+- Flag missing critical data for coach attention
+
+### 3.9 Confidence Model
+Weighted formula:
+```
+confidence = (dataAvailability × 0.4) + (groundingQuality × 0.3) + (outputQuality × 0.2) + (safetyScore × 0.1)
+```
+
+| Range | Interpretation | Action |
+|-------|----------------|--------|
+| 0.9–1.0 | High confidence | Present with confidence badge |
+| 0.7–0.9 | Medium confidence | Present with caution note |
+| 0.5–0.7 | Low confidence | Flag for careful review |
+| < 0.5 | Very low confidence | Reject and regenerate |
+
+### 3.10 Future AI Features (12 Capabilities)
+1. Weekly Summaries
+2. Parent Reports
+3. Student Reports
+4. Risk Detection
+5. Goal Suggestions
+6. Sprint Planning
+7. Session Preparation
+8. Long-Term Trend Analysis
+9. Coaching Plan Suggestions
+10. Automated Report Scheduling
+11. Cross-Student Insights
+12. Predictive Analytics
+
+### 3.11 Open Questions (10 Architectural Decisions)
+1. LLM Provider Selection
+2. Prompt Versioning Strategy
+3. Output Schema Evolution
+4. Cost Tracking and Budgeting
+5. Caching Strategy
+6. Multi-Language Support
+7. AI Output Editability
+8. AI Transparency
+9. Fallback Strategy
+10. AI Training and Fine-Tuning
+
+## 4. Design Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| AI is a supporting actor, not a decision-maker | Aligns with product principle: "AI assists; humans decide and publish" |
+| 12 non-negotiable AI principles | Derived from Product Architecture v1.1 and Notion System Blueprint v1.1 |
+| 7 AI personas with distinct responsibilities | Maps to workspace architecture defined in Workspace Blueprints v1.1 |
+| 9-stage report generation pipeline | Mirrors the Report Builder → Report Workspace boundary from Integration Contract v1.1 |
+| Structured Markdown + JSON metadata output | Balances coach editability with machine validation |
+| 5-stage validation layer | Enforces AI principles at the system level, not just prompt level |
+| Weighted confidence model | Quantifies AI reliability for coach transparency |
+| Explicit missing data strategy | Enforces "never invent" principle with concrete fallback behavior |
+
+## 5. Remaining Open Questions
+
+All 10 open questions are documented in Section 11 of the specification. The most critical decisions needed before implementation:
+
+1. **LLM Provider Selection** — Must be decided before Sprint 2 (LLM Integration)
+2. **Prompt Versioning Strategy** — Affects how prompts are managed and iterated
+3. **Cost Tracking** — Required for production deployment budgeting
+4. **Fallback Strategy** — Required for production reliability
+
+## 6. Recommended Next Sprint
+
+**Sprint: AI Engine Sprint 2 — LLM Provider Integration**
+
+Based on the AI Design Specification, the next sprint should:
+
+1. Select and configure an LLM provider (OpenAI, Anthropic, or OpenRouter)
+2. Implement provider abstraction layer (`src/lib/ai/provider.types.ts`)
+3. Implement provider adapter(s)
+4. Connect the Prompt Builder to the LLM provider
+5. Implement the Validation Layer (grounding check, safety check, quality check)
+6. Implement confidence scoring
+7. Build end-to-end test: ReportContext → Prompt → LLM → Validated Output
+8. Add temporary UI to display generated reports (read-only, no publishing)
+
+**Prerequisites:**
+- Resolve LLM Provider Selection open question
+- Set up environment variables for API keys
+- Establish cost tracking baseline
+
+## 7. Build Result
+
+**Status:** N/A (documentation-only sprint, no build required)
+
+No code was changed, so no build was run. The existing production build remains valid.
+
+## 8. Commit Hash
+
+**Commit:** `67b5a28`  
+**Message:** `Add AI Design Specification`  
+**Branch:** `main`  
+**Files changed:** 1 file (+1,319 lines)
+
+## 9. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   3c9dfd0..67b5a28  main -> main
+```
+
+Successfully pushed to `origin/main`.
+
+## 10. git status --short
+
+```
+?? Koc360_Dokuman_Tutarlilik_ve_Karar_Matrisi_v1.1.docx
+?? Koc360_Notion_System_Blueprint_v1.1.docx
+?? Koc360_Notion_Technical_Audit_v1.1_Current_Baseline.docx
+?? Koc360_Notion_Web_App_Integration_Contract_v1.1.docx
+?? Koc360_Product_Architecture_v1.1.docx
+?? Koc360_User_Flow_v1.1.docx
+?? Koc360_Veri_Giris_ve_Yasam_Dongusu_Mimarisi_v1.1.docx
+?? Koc360_Workspace_Blueprints_v1.1.docx
+```
+
+The 8 .docx documentation files remain untracked. Only `docs/AI_Design_Specification.md` was committed.
+
+---
+
+## Summary
+
+Created the **AI Design Specification** — the authoritative technical specification for all AI features in Koç360. This document:
+
+- **Defines AI's role** as a supporting actor that assists but never decides or publishes
+- **Establishes 12 non-negotiable AI principles** derived from product documentation
+- **Specifies 7 AI personas** mapped to workspace responsibilities
+- **Documents the 9-stage Report Generation Pipeline** from data collection to publishing
+- **Defines the 7-section Prompt Architecture** for consistent, provider-independent prompts
+- **Selects Structured Markdown + JSON metadata** as the output format
+- **Specifies the 5-stage Validation Layer** for quality and safety enforcement
+- **Defines the Missing Data Strategy** for graceful handling of incomplete information
+- **Provides the Confidence Model** with weighted scoring formula
+- **Lists 12 future AI features** and **10 open architectural questions**
+
+**This sprint was documentation-only.** No code was written, no routes were modified, no components were changed, no ReportContext was modified, no Notion schema was changed, and no Prompt Builder was modified.
+
+**Next step:** Resolve open questions (especially LLM Provider Selection) and begin Sprint 2: LLM Provider Integration.
+
+**Committed:** `67b5a28`  
+**Pushed to:** `origin/main`  
+**Total files created:** 1  
+**Total lines added:** 1,319
