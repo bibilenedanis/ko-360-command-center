@@ -568,3 +568,278 @@ Only the `design/` directory (original HTML design file) remains untracked. All 
 To https://github.com/bibilenedanis/ko-360-command-center.git
    e4de588..9436208  main -> main
 ```
+
+---
+
+# ReportContext Layer Implementation Report
+
+## 1. Files Modified
+
+**None.** This sprint added new files only. No existing code was modified.
+
+## 2. Files Created
+
+- `src/lib/report/context.types.ts` — Complete type definitions for the ReportContext domain model
+- `src/lib/report/context.server.ts` — Builder function `buildReportContext(sessionId)` that aggregates all data sources
+
+## 3. ReportContext Domain Model
+
+```
+ReportContext
+├── student: ReportContextStudent
+│   ├── id, name, studentId
+│   ├── educationLevel, status
+│   └── attentionStatus, attentionReason
+├── session: ReportContextSession
+│   ├── id, title, date
+│   ├── type, status
+├── sessionNotes: ReportContextSessionNotes
+│   ├── winsAndProgress
+│   ├── challengesAndObstacles
+│   ├── coreNotes
+│   └── commitments
+├── assessment: ReportContextAssessment | null
+│   ├── id, title, type, date
+│   ├── score, result
+├── goals: ReportContextGoals
+│   ├── active: ReportContextGoal[]
+│   └── completed: ReportContextGoal[]
+├── sprint: ReportContextSprint | null
+│   ├── id, title, status
+│   ├── focus, endDate
+│   └── progressPercent
+├── tasks: ReportContextTasks
+│   ├── overdue: ReportContextTask[]
+│   ├── upcoming: ReportContextTask[]
+│   └── completed: ReportContextTask[]
+├── recommendations: ReportContextRecommendations
+│   ├── pendingHighRisk: ReportContextRecommendation[]
+│   ├── pendingOther: ReportContextRecommendation[]
+│   └── reviewed: ReportContextRecommendation[]
+├── coachNotes: ReportContextCoachNotes (placeholder)
+│   ├── available: false
+│   ├── reason: string
+│   └── notes: null
+├── parentFeedback: ReportContextParentFeedback (placeholder)
+│   ├── available: false
+│   ├── reason: string
+│   └── feedback: null
+├── previousReports: ReportContextPreviousReports (placeholder)
+│   ├── available: false
+│   ├── reason: string
+│   └── reports: null
+└── metadata: ReportContextMetadata
+    ├── sessionId, studentId, builtAt
+    └── dataAvailability: { student, session, sessionNotes, assessment, goals, sprint, tasks, recommendations, coachNotes, parentFeedback, previousReports }
+```
+
+## 4. Data Flow
+
+```
+buildReportContext(sessionId)
+    ├── 1. fetchSessions() → find session by ID
+    ├── 2. extractRelationIds(session, "Student") → get studentId
+    ├── 3. getStudentProfileData(studentId) → get all student data
+    ├── 4. Build context sections:
+    │   ├── buildStudent(profile)
+    │   ├── buildSession(sessionPage)
+    │   ├── buildSessionNotes(sessionPage)
+    │   ├── buildAssessment(profile.assessments)
+    │   ├── buildGoals(profile.goals)
+    │   ├── buildSprint(profile.sprints)
+    │   ├── buildTasks(profile.tasks)
+    │   ├── buildRecommendations(profile.aiRecommendations)
+    │   ├── buildCoachNotes() → placeholder
+    │   ├── buildParentFeedback() → placeholder
+    │   └── buildPreviousReports() → placeholder
+    ├── 5. Compute dataAvailability flags
+    └── 6. Assemble and return ReportContext
+```
+
+## 5. Reused Existing Functions
+
+| Function | Source | Purpose |
+|----------|--------|---------|
+| `fetchSessions()` | `@/lib/notion/queries.server` | Fetch all sessions from Notion |
+| `getStudentProfileData(studentId)` | `@/lib/students/profile.server` | Fetch complete student profile |
+| `extractRelationIds()` | `@/lib/notion/transformers` | Extract student ID from session |
+| `extractTitle()` | `@/lib/notion/transformers` | Extract title from Notion page |
+| `extractDate()` | `@/lib/notion/transformers` | Extract date from Notion page |
+| `extractSelect()` | `@/lib/notion/transformers` | Extract select field from Notion page |
+| `extractRichText()` | `@/lib/notion/transformers` | Extract rich text from Notion page |
+| `extractNumber()` | `@/lib/notion/transformers` | Extract number from Notion page |
+| `extractCheckbox()` | `@/lib/notion/transformers` | Extract checkbox from Notion page |
+
+## 6. Typed Placeholders
+
+Three data sources are not yet implemented and have typed placeholders:
+
+### Coach Notes
+```typescript
+interface ReportContextCoachNotes {
+  available: false;
+  reason: string;  // "Coach notes database not yet implemented..."
+  notes: null;
+}
+```
+
+### Parent Feedback
+```typescript
+interface ReportContextParentFeedback {
+  available: false;
+  reason: string;  // "Parent feedback database not yet implemented..."
+  feedback: null;
+}
+```
+
+### Previous Reports
+```typescript
+interface ReportContextPreviousReports {
+  available: false;
+  reason: string;  // "Previous reports database not yet implemented..."
+  reports: null;
+}
+```
+
+## 7. Data Availability Tracking
+
+The `metadata.dataAvailability` object tracks which data sources are available:
+
+```typescript
+dataAvailability: {
+  student: boolean;         // Always true if student exists
+  session: boolean;         // Always true if session exists
+  sessionNotes: boolean;    // Always true if session exists
+  assessment: boolean;      // True if student has assessments
+  goals: boolean;           // True if student has goals
+  sprint: boolean;          // True if student has active sprint
+  tasks: boolean;           // True if student has tasks
+  recommendations: boolean; // True if student has AI recommendations
+  coachNotes: false;        // Always false (not implemented)
+  parentFeedback: false;    // Always false (not implemented)
+  previousReports: false;   // Always false (not implemented)
+}
+```
+
+This allows the AI pipeline to:
+- Know which data sources are available before generating a report
+- Adjust the prompt based on missing data
+- Provide warnings about incomplete reports
+
+## 8. Helper Functions
+
+### Classification Helpers
+- `isTaskDone(status)` — Checks if a task/goal is completed
+- `isTaskInProgress(status)` — Checks if a sprint/task is active
+- `isPast(date)` — Checks if a date is in the past
+- `isHighRisk(risk)` — Checks if an AI recommendation is high risk
+- `isPendingReview(status)` — Checks if a recommendation needs review
+
+### Builder Functions
+- `buildStudent(profile)` — Maps StudentProfileData to ReportContextStudent
+- `buildSession(sessionPage)` — Maps Notion session page to ReportContextSession
+- `buildSessionNotes(sessionPage)` — Extracts session notes from Notion page
+- `buildAssessment(assessments)` — Finds most recent assessment
+- `buildGoals(goals)` — Separates active and completed goals
+- `buildSprint(sprints)` — Finds active sprint
+- `buildTasks(tasks)` — Categorizes tasks into overdue/upcoming/completed
+- `buildRecommendations(recommendations)` — Categorizes recommendations by risk and review status
+
+## 9. Error Handling
+
+The builder function throws errors for critical failures:
+
+```typescript
+// Session not found
+if (!sessionPage) {
+  throw new Error(`Session not found: ${sessionId}`);
+}
+
+// No student associated with session
+if (!studentId) {
+  throw new Error(`No student associated with session: ${sessionId}`);
+}
+
+// Failed to fetch sessions
+if (!sessionsResult.ok) {
+  throw new Error(`Failed to fetch sessions: ${sessionsResult.message}`);
+}
+```
+
+Graceful handling for missing optional data:
+- Returns `null` for missing assessment
+- Returns `null` for missing sprint
+- Returns empty arrays for missing goals/tasks/recommendations
+- Never throws for missing optional data
+
+## 10. Provider Independence
+
+The ReportContext model is completely provider-independent:
+
+- ✅ No references to OpenAI, Anthropic, Gemini, or any LLM provider
+- ✅ No provider-specific data structures
+- ✅ No API keys or configuration
+- ✅ No provider-specific error handling
+- ✅ Pure TypeScript interfaces
+- ✅ Can be serialized to JSON for any LLM API
+
+## 11. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: modules transformed
+✓ SSR build: 127 modules transformed
+✓ Nitro build: 298 modules transformed
+```
+
+No build errors or warnings.
+
+## 12. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	design/
+```
+
+Only the `design/` directory (original HTML design file) remains untracked. All implementation files are committed.
+
+## 13. Latest Commit Hash
+
+**Commit:** `c91d735`  
+**Message:** `Implement ReportContext layer for AI report generation`  
+**Branch:** `main`  
+**Files changed:** 2 files (+575 lines)
+
+## 14. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   c418fed..c91d735  main -> main
+```
+
+---
+
+## Summary
+
+Implemented the ReportContext layer that will serve as the single source of truth for AI report generation. This layer:
+
+- **Aggregates all data sources** needed for report generation in a single `buildReportContext(sessionId)` function
+- **Reuses existing query functions** (`fetchSessions`, `getStudentProfileData`) without duplicating logic
+- **Provides typed placeholders** for unimplemented data sources (coach notes, parent feedback, previous reports)
+- **Tracks data availability** so the AI pipeline knows what data is available before generating a report
+- **Is completely provider-independent** — no references to any specific LLM provider
+- **Follows existing architecture patterns** — uses `.server.ts` suffix, TypeScript interfaces, existing transformers
+
+**Next step:** Connect this ReportContext to an LLM provider to generate actual reports.
+
+**Build status:** ✅ Success  
+**Deployed to:** `origin/main`  
+**Total files created:** 2  
+**Total lines added:** 575
