@@ -1,6 +1,6 @@
 # Koç360 AI Design Specification
 
-> **Version:** 1.0  
+> **Version:** 1.1  
 > **Status:** Draft  
 > **Date:** 3 August 2026  
 > **Author:** AI Architecture Team  
@@ -21,6 +21,12 @@
 9. [Confidence Model](#9-confidence-model)
 10. [Future AI Features](#10-future-ai-features)
 11. [Open Questions](#11-open-questions)
+12. [AI Memory Architecture](#12-ai-memory-architecture)
+13. [Reasoning Strategy](#13-reasoning-strategy)
+14. [Evidence Model](#14-evidence-model)
+15. [Confidence Model v2](#15-confidence-model-v2)
+16. [Feedback Loop](#16-feedback-loop)
+17. [Architectural Principles](#17-architectural-principles)
 
 ---
 
@@ -1282,7 +1288,869 @@ This section lists architectural decisions that still need to be made. These que
 
 ---
 
-## Appendix A: Glossary
+## 12. AI Memory Architecture
+
+AI Memory is the system's ability to retain, organize, and retrieve information about students, coaching patterns, and historical context over time. It enables the AI to provide increasingly personalized and contextually aware assistance.
+
+### 12.1 What is AI Memory?
+
+AI Memory is a structured knowledge layer that stores:
+
+- **Student profiles**: Demographics, preferences, learning styles, communication patterns
+- **Coaching history**: Past sessions, reports, goals, sprints, and outcomes
+- **Behavioral patterns**: Recurring challenges, successful strategies, engagement trends
+- **Coach preferences**: Report style, communication tone, focus areas
+- **Contextual knowledge**: Student interests, family context, external factors
+
+Memory is **not** a replacement for authoritative records (Notion databases). It is a derived, read-only knowledge layer that synthesizes information from authoritative sources to provide richer context for AI interactions.
+
+### 12.2 Why is AI Memory Different from ReportContext?
+
+| Aspect | ReportContext | AI Memory |
+|--------|---------------|-----------|
+| **Scope** | Single report generation | Long-term student coaching history |
+| **Lifetime** | Ephemeral (exists only during report generation) | Persistent (accumulates over time) |
+| **Source** | Direct Notion queries | Derived from multiple reports, sessions, and interactions |
+| **Mutability** | Read-only snapshot | Evolves as new data arrives |
+| **Purpose** | Provide data for one report | Provide context for all AI interactions |
+| **Privacy** | Scoped to one report | Scoped to student + coach relationship |
+
+**ReportContext** is like a camera snapshot: it captures the current state for a specific purpose.
+
+**AI Memory** is like a coach's mental model: it accumulates understanding over time, recognizing patterns and providing context that no single report can capture.
+
+### 12.3 Memory Types
+
+#### 12.3.1 Short-Term Memory
+
+**Purpose:** Maintain context within a single coaching session or report generation flow.
+
+**Contents:**
+- Current session notes
+- Active sprint goals and tasks
+- Recent assessment results
+- Coach's current focus areas
+
+**Lifetime:** Minutes to hours (cleared after session/report completion)
+
+**Example:**
+```typescript
+{
+  sessionId: "session-123",
+  currentFocus: "Improving study habits for upcoming exams",
+  activeTopics: ["time management", "note-taking strategies"],
+  recentMentions: ["student mentioned feeling overwhelmed"]
+}
+```
+
+#### 12.3.2 Long-Term Memory
+
+**Purpose:** Store persistent knowledge about a student that remains relevant across multiple sessions and reports.
+
+**Contents:**
+- Student demographics and background
+- Learning preferences and styles
+- Communication preferences
+- Family context (when shared by coach)
+- Long-term goals and aspirations
+- Historical achievements and challenges
+
+**Lifetime:** Persistent (updated as new information becomes available)
+
+**Example:**
+```typescript
+{
+  studentId: "student-456",
+  learningStyle: "Visual learner, prefers diagrams and charts",
+  communicationPreference: "Responds well to encouraging, specific feedback",
+  familyContext: "First-generation college student, parents supportive but unfamiliar with process",
+  longTermGoal: "Engineering degree, interested in renewable energy",
+  historicalPatterns: {
+    strengths: ["Creative problem-solving", "Strong verbal communication"],
+    challenges: ["Procrastination under stress", "Difficulty with structured planning"]
+  }
+}
+```
+
+#### 12.3.3 Episodic Memory
+
+**Purpose:** Store specific events and interactions that may be relevant for future context.
+
+**Contents:**
+- Key session moments (breakthroughs, challenges, commitments)
+- Significant assessment results
+- Goal achievements and milestones
+- Critical incidents (e.g., student expressed frustration, major life event)
+
+**Lifetime:** Persistent (indexed by date and relevance)
+
+**Example:**
+```typescript
+{
+  episodes: [
+    {
+      date: "2026-07-15",
+      type: "breakthrough",
+      summary: "Student identified root cause of procrastination: fear of failure",
+      impact: "Led to new goal around growth mindset",
+      sessionId: "session-789"
+    },
+    {
+      date: "2026-07-22",
+      type: "challenge",
+      summary: "Student missed two consecutive sessions due to family emergency",
+      impact: "Adjusted sprint goals to accommodate reduced availability",
+      sessionId: "session-790"
+    }
+  ]
+}
+```
+
+### 12.4 Pattern Memory
+
+#### 12.4.1 Behavioral Patterns
+
+**Purpose:** Identify recurring behaviors, both positive and negative, that inform coaching strategies.
+
+**Contents:**
+- Study habits (consistent, erratic, improving)
+- Session attendance patterns
+- Task completion trends
+- Stress responses
+- Communication patterns
+
+**Detection:** Derived from multiple sessions and reports using pattern recognition.
+
+**Example:**
+```typescript
+{
+  patterns: [
+    {
+      type: "positive",
+      behavior: "Task completion improves after goal-setting sessions",
+      confidence: 0.85,
+      evidence: ["session-101", "session-105", "session-110"],
+      firstObserved: "2026-06-01",
+      lastObserved: "2026-07-20"
+    },
+    {
+      type: "negative",
+      behavior: "Procrastination increases during exam periods",
+      confidence: 0.78,
+      evidence: ["session-095", "session-102", "session-108"],
+      firstObserved: "2026-05-15",
+      lastObserved: "2026-07-18"
+    }
+  ]
+}
+```
+
+#### 12.4.2 Learning Patterns
+
+**Purpose:** Understand how the student learns best, what strategies work, and what obstacles exist.
+
+**Contents:**
+- Effective study strategies
+- Preferred learning modalities
+- Optimal session timing
+- Challenge areas and successful interventions
+
+**Example:**
+```typescript
+{
+  learningPatterns: {
+    effectiveStrategies: [
+      "Breaking large tasks into smaller chunks",
+      "Using visual organizers for planning",
+      "Setting specific, measurable daily goals"
+    ],
+    ineffectiveStrategies: [
+      "Cramming before deadlines",
+      "Working in distracting environments"
+    ],
+    optimalConditions: {
+      sessionLength: "45-60 minutes",
+      sessionFrequency: "Weekly",
+      timeOfDay: "Afternoon (2-4 PM)"
+    }
+  }
+}
+```
+
+### 12.5 Historical Trends
+
+**Purpose:** Track progress and changes over time to identify growth trajectories and emerging issues.
+
+**Contents:**
+- Goal achievement rates over time
+- Skill development trajectories
+- Engagement trends
+- Risk signal evolution
+
+**Example:**
+```typescript
+{
+  trends: [
+    {
+      metric: "taskCompletionRate",
+      period: "2026-06-01 to 2026-07-31",
+      data: [
+        { date: "2026-06-01", value: 0.45 },
+        { date: "2026-06-15", value: 0.58 },
+        { date: "2026-07-01", value: 0.72 },
+        { date: "2026-07-15", value: 0.81 }
+      ],
+      trend: "improving",
+      velocity: "+0.12 per week"
+    },
+    {
+      metric: "sessionAttendance",
+      period: "2026-06-01 to 2026-07-31",
+      data: [
+        { date: "2026-06-01", value: 1.0 },
+        { date: "2026-06-15", value: 0.8 },
+        { date: "2026-07-01", value: 0.6 },
+        { date: "2026-07-15", value: 0.4 }
+      ],
+      trend: "declining",
+      velocity: "-0.15 per week",
+      alert: true
+    }
+  ]
+}
+```
+
+### 12.6 Coach Preferences
+
+**Purpose:** Learn and adapt to the coach's style, preferences, and expectations.
+
+**Contents:**
+- Report tone and structure preferences
+- Communication style
+- Focus areas and priorities
+- Feedback patterns
+
+**Example:**
+```typescript
+{
+  coachPreferences: {
+    reportStyle: {
+      tone: "Encouraging but direct",
+      structure: "Prefers executive summary followed by detailed analysis",
+      length: "800-1200 words",
+      emphasis: ["Actionable recommendations", "Evidence-based insights"]
+    },
+    communicationStyle: {
+      formality: "Professional but warm",
+      detailLevel: "High (prefers specific examples)",
+      feedbackPattern: "Provides detailed edits on first few reports, then less over time"
+    },
+    focusAreas: [
+      "Academic performance",
+      "Time management",
+      "Goal-setting skills"
+    ]
+  }
+}
+```
+
+### 12.7 Memory Lifecycle
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 1: Ingestion                                          │
+│  New data arrives from authoritative sources (sessions,     │
+│  reports, assessments, goals, sprints, tasks).              │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 2: Extraction                                         │
+│  Extract relevant information for memory storage.           │
+│  Identify patterns, trends, and significant events.         │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 3: Indexing                                           │
+│  Index memory by student, date, topic, and relevance.       │
+│  Link to source records for traceability.                   │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 4: Storage                                            │
+│  Store in structured memory format (short-term, long-term,  │
+│  episodic, patterns, trends).                               │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 5: Retrieval                                          │
+│  When AI needs context, retrieve relevant memories based    │
+│  on current task, student, and time horizon.                │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 6: Decay & Archival                                   │
+│  Old or irrelevant memories are archived or decay.          │
+│  Critical memories are preserved indefinitely.              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 12.8 Memory Invalidation
+
+Memory must be invalidated when:
+
+1. **Authoritative data changes**: If a session note is edited, the corresponding episodic memory must be updated.
+2. **Coach requests deletion**: If a coach requests removal of specific information, it must be purged from memory.
+3. **Student transfers**: If a student is transferred to a different coach, the previous coach's memory access is revoked.
+4. **Data retention policy**: Memories older than the retention period are archived or deleted.
+5. **Privacy violation**: If memory contains information that should not have been stored, it must be purged.
+
+**Invalidation Strategy:**
+- Use event-driven updates (listen for changes in authoritative sources).
+- Maintain audit logs of all memory modifications.
+- Implement soft deletion (mark as archived) before hard deletion.
+- Provide coach controls to review and manage memory.
+
+### 12.9 Privacy Boundaries
+
+AI Memory must respect strict privacy boundaries:
+
+1. **Coach-scoped**: Each coach has their own memory layer for each student. Memories are not shared across coaches.
+2. **Student-scoped**: Memories are isolated by student. No cross-student memory access.
+3. **Permission-scoped**: Memory access follows the same permission model as authoritative data.
+4. **Consent-aware**: If a student or parent requests that certain information not be stored, it must be excluded from memory.
+5. **Audit-trail**: All memory access and modifications are logged for compliance.
+
+**Memory Access Control:**
+```typescript
+interface MemoryAccessControl {
+  coachId: string;
+  studentId: string;
+  permission: 'read' | 'write' | 'none';
+  scope: 'full' | 'limited' | 'none';
+  expiresAt?: string;
+}
+```
+
+---
+
+## 13. Reasoning Strategy
+
+AI must follow a structured reasoning process before producing any output. This ensures that outputs are evidence-based, logical, and transparent.
+
+### 13.1 Reasoning Pipeline
+
+The AI must never jump directly from facts to recommendations. Instead, it must follow this pipeline:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 1: Facts                                              │
+│  Identify all factual data points from supplied sources.    │
+│  Facts are objective, verifiable, and unambiguous.          │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 2: Evidence                                           │
+│  Group related facts into evidence clusters.                │
+│  Assess the quality, relevance, and completeness of         │
+│  each evidence cluster.                                      │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 3: Patterns                                           │
+│  Identify patterns, trends, and correlations in the         │
+│  evidence. Patterns may be positive, negative, or neutral.  │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 4: Insights                                           │
+│  Derive insights from patterns. Insights are interpretations│
+│  that explain what the patterns mean for the student.       │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Stage 5: Recommendations                                    │
+│  Generate actionable recommendations based on insights.     │
+│  Recommendations must be specific, measurable, and          │
+│  achievable.                                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 13.2 Stage Details
+
+#### 13.2.1 Facts
+
+**Definition:** Objective, verifiable data points from supplied sources.
+
+**Characteristics:**
+- Directly observable or measurable
+- Not open to interpretation
+- Traceable to a specific source
+- Free from bias or judgment
+
+**Examples:**
+- "The student completed 8 out of 10 tasks this sprint."
+- "The student attended 4 out of 5 sessions this month."
+- "The student's assessment score was 85/100."
+- "The student mentioned feeling stressed about upcoming exams."
+
+**Rules:**
+- Only include facts that are present in the supplied data.
+- Do not infer or assume facts that are not explicitly stated.
+- Cite the source for each fact.
+
+#### 13.2.2 Evidence
+
+**Definition:** Clusters of related facts that support or refute a specific claim.
+
+**Characteristics:**
+- Multiple facts grouped by theme or topic
+- Assessed for quality (reliability, relevance, completeness)
+- May be strong, moderate, or weak
+- May be conflicting (different facts point in different directions)
+
+**Examples:**
+- **Evidence cluster: "Improving task completion"**
+  - Fact 1: Sprint 10 completion rate: 60%
+  - Fact 2: Sprint 11 completion rate: 75%
+  - Fact 3: Sprint 12 completion rate: 80%
+  - Quality: Strong (consistent upward trend over 3 sprints)
+
+- **Evidence cluster: "Declining session attendance"**
+  - Fact 1: Month 1 attendance: 100%
+  - Fact 2: Month 2 attendance: 80%
+  - Fact 3: Month 3 attendance: 60%
+  - Quality: Strong (consistent downward trend over 3 months)
+
+**Rules:**
+- Group facts by theme, not by source.
+- Assess the quality of each evidence cluster.
+- Flag conflicting evidence for further analysis.
+
+#### 13.2.3 Patterns
+
+**Definition:** Recurring themes, trends, or correlations identified in the evidence.
+
+**Characteristics:**
+- Derived from evidence clusters
+- May be positive, negative, or neutral
+- May be short-term or long-term
+- May be causal or correlational
+
+**Examples:**
+- **Pattern: "Task completion improves after goal-setting sessions"**
+  - Evidence: 3 consecutive sprints show increased completion after goal-setting sessions
+  - Type: Positive
+  - Confidence: High
+
+- **Pattern: "Stress increases during exam periods"**
+  - Evidence: Student mentioned stress in 4 out of 5 sessions during exam periods
+  - Type: Negative
+  - Confidence: Moderate
+
+**Rules:**
+- Only identify patterns that are supported by evidence.
+- Distinguish between correlation and causation.
+- Assign a confidence level to each pattern.
+
+#### 13.2.4 Insights
+
+**Definition:** Interpretations that explain what patterns mean for the student.
+
+**Characteristics:**
+- Derived from patterns
+- Provide context and meaning
+- May include hypotheses (clearly labeled as such)
+- Must be grounded in evidence
+
+**Examples:**
+- **Insight: "The student benefits from structured planning"**
+  - Pattern: Task completion improves after goal-setting sessions
+  - Interpretation: The student thrives when given clear structure and accountability
+  - Hypothesis: Introducing more structured planning may improve overall performance
+
+- **Insight: "Exam periods are a critical stress point"**
+  - Pattern: Stress increases during exam periods
+  - Interpretation: The student needs additional support during high-pressure periods
+  - Hypothesis: Proactive stress management strategies may mitigate this pattern
+
+**Rules:**
+- Clearly distinguish between facts, patterns, and insights.
+- Label hypotheses as such.
+- Ensure insights are actionable and relevant to coaching goals.
+
+#### 13.2.5 Recommendations
+
+**Definition:** Specific, actionable suggestions based on insights.
+
+**Characteristics:**
+- Derived from insights
+- Specific and measurable
+- Achievable within the student's context
+- Time-bound (short-term, medium-term, long-term)
+
+**Examples:**
+- **Recommendation: "Introduce weekly planning sessions"**
+  - Insight: The student benefits from structured planning
+  - Action: Schedule 15-minute planning sessions at the start of each week
+  - Timeline: Start next week, review after 4 weeks
+  - Success metric: Task completion rate increases to 85%
+
+- **Recommendation: "Develop exam stress management plan"**
+  - Insight: Exam periods are a critical stress point
+  - Action: Create a stress management plan including breaks, exercise, and relaxation techniques
+  - Timeline: Implement before next exam period (6 weeks)
+  - Success metric: Student reports reduced stress during exams
+
+**Rules:**
+- Every recommendation must be traceable to an insight.
+- Recommendations must be specific and actionable.
+- Include success metrics and timelines.
+
+### 13.3 Reasoning Transparency
+
+The AI must make its reasoning process transparent to the coach. This builds trust and allows the coach to validate the AI's logic.
+
+**Transparency Mechanisms:**
+1. **Source citations**: Every fact must cite its source.
+2. **Evidence summaries**: Show the evidence clusters that support each pattern.
+3. **Pattern explanations**: Explain how patterns were identified.
+4. **Insight rationale**: Explain why each insight was derived.
+5. **Recommendation justification**: Explain why each recommendation was made.
+
+**Example of Transparent Reasoning:**
+```
+FACT: The student completed 8 out of 10 tasks this sprint (Source: Sprint 12 task list).
+
+EVIDENCE: 
+- Sprint 10: 6/10 tasks completed (60%)
+- Sprint 11: 7/10 tasks completed (70%)
+- Sprint 12: 8/10 tasks completed (80%)
+Quality: Strong (consistent upward trend)
+
+PATTERN: Task completion is improving over time.
+Type: Positive
+Confidence: High
+
+INSIGHT: The student is developing better task management skills.
+Rationale: The consistent improvement over 3 sprints suggests the student is internalizing effective strategies.
+
+RECOMMENDATION: Continue current task management approach and introduce more complex tasks.
+Justification: The student has demonstrated readiness for increased challenge.
+```
+
+---
+
+## 14. Evidence Model
+
+The Evidence Model defines how AI evaluates the quality, relevance, and weight of data sources. It ensures that AI outputs are grounded in reliable evidence.
+
+### 14.1 Evidence Sources
+
+Evidence sources are the authoritative data repositories from which AI draws information.
+
+**Primary Sources:**
+- **Sessions**: Session notes, outcomes, commitments, follow-ups
+- **Assessments**: Assessment results, scores, types, dates
+- **Goals**: Goal definitions, progress, status, achievements
+- **Sprints**: Sprint objectives, progress, task completion
+- **Tasks**: Task completion, overdue status, priorities
+- **Reports**: Previous reports, publication history
+
+**Secondary Sources:**
+- **Student Profile**: Demographics, preferences, background
+- **Coach Notes**: Private observations, contextual information
+- **Parent Feedback**: Parent observations and concerns
+- **AI Recommendations**: Previous AI-generated recommendations
+
+### 14.2 Evidence Weight
+
+Not all evidence is equally reliable. The Evidence Weight model assigns a weight to each source based on its reliability and relevance.
+
+**Weight Factors:**
+
+| Factor | Description | Impact |
+|--------|-------------|--------|
+| **Source Authority** | How authoritative is the source? | Direct observations > second-hand reports |
+| **Recency** | How recent is the evidence? | Recent > old (within context) |
+| **Completeness** | How complete is the data? | Complete > partial |
+| **Consistency** | Is the evidence consistent with other sources? | Consistent > conflicting |
+| **Relevance** | How relevant is the evidence to the current task? | Highly relevant > tangential |
+
+**Weight Calculation:**
+```typescript
+function computeEvidenceWeight(source: EvidenceSource): number {
+  const authority = getAuthorityWeight(source.type); // 0.0 - 1.0
+  const recency = getRecencyWeight(source.date); // 0.0 - 1.0
+  const completeness = getCompletenessWeight(source.data); // 0.0 - 1.0
+  const consistency = getConsistencyWeight(source, otherSources); // 0.0 - 1.0
+  const relevance = getRelevanceWeight(source, currentTask); // 0.0 - 1.0
+
+  return (
+    authority * 0.3 +
+    recency * 0.2 +
+    completeness * 0.2 +
+    consistency * 0.15 +
+    relevance * 0.15
+  );
+}
+```
+
+**Example Weights:**
+- Session notes (direct observation): 0.95
+- Assessment results (objective measure): 0.90
+- Coach notes (subjective observation): 0.75
+- Parent feedback (second-hand): 0.60
+- AI recommendations (derived): 0.50
+
+### 14.3 Evidence Density
+
+Evidence Density measures how much evidence is available for a given claim or topic.
+
+**Definition:**
+```
+Evidence Density = (Number of evidence points) / (Expected number of evidence points)
+```
+
+**Interpretation:**
+- **High density (> 0.8)**: Abundant evidence, high confidence
+- **Medium density (0.5 - 0.8)**: Adequate evidence, moderate confidence
+- **Low density (0.2 - 0.5)**: Limited evidence, low confidence
+- **Very low density (< 0.2)**: Insufficient evidence, very low confidence
+
+**Example:**
+```typescript
+// Claim: "The student is improving in time management"
+const evidencePoints = [
+  { type: "task_completion", weight: 0.9 },
+  { type: "session_note", weight: 0.8 },
+  { type: "sprint_progress", weight: 0.85 },
+  { type: "coach_observation", weight: 0.7 }
+];
+
+const expectedPoints = 4; // Based on available sources
+const actualPoints = evidencePoints.length;
+const density = actualPoints / expectedPoints; // 1.0 (high density)
+```
+
+### 14.4 Evidence Freshness
+
+Evidence Freshness measures how current the evidence is. Stale evidence may not reflect the current state.
+
+**Definition:**
+```
+Evidence Freshness = f(age, decayRate, context)
+```
+
+**Decay Function:**
+```typescript
+function computeEvidenceFreshness(evidenceDate: Date, context: EvidenceContext): number {
+  const ageInDays = (Date.now() - evidenceDate.getTime()) / (1000 * 60 * 60 * 24);
+  const decayRate = context.decayRate; // e.g., 0.1 per week
+  
+  // Exponential decay
+  const freshness = Math.exp(-decayRate * (ageInDays / 7));
+  
+  return Math.max(0, Math.min(1, freshness));
+}
+```
+
+**Context-Specific Decay Rates:**
+- **Session notes**: Slow decay (0.05 per week) — historical context remains relevant
+- **Task completion**: Fast decay (0.2 per week) — recent performance is more relevant
+- **Assessment results**: Medium decay (0.1 per week) — skills develop over time
+- **Goal progress**: Medium decay (0.1 per week) — progress is cumulative
+
+### 14.5 Evidence Quality
+
+Evidence Quality is a composite score that combines weight, density, and freshness.
+
+**Definition:**
+```
+Evidence Quality = Evidence Weight × Evidence Density × Evidence Freshness
+```
+
+**Interpretation:**
+- **High quality (> 0.7)**: Reliable, abundant, current evidence
+- **Medium quality (0.4 - 0.7)**: Adequate evidence with some limitations
+- **Low quality (< 0.4)**: Limited, outdated, or unreliable evidence
+
+**Example:**
+```typescript
+const evidenceQuality = {
+  weight: 0.85, // High authority source
+  density: 0.75, // Good amount of evidence
+  freshness: 0.90, // Very recent
+  composite: 0.85 * 0.75 * 0.90 // 0.57 (medium-high quality)
+};
+```
+
+### 14.6 Conflicting Evidence
+
+When evidence from different sources conflicts, the AI must handle it transparently and responsibly.
+
+**Conflict Detection:**
+```typescript
+function detectConflicts(evidence: EvidencePoint[]): Conflict[] {
+  const conflicts: Conflict[] = [];
+  
+  for (let i = 0; i < evidence.length; i++) {
+    for (let j = i + 1; j < evidence.length; j++) {
+      if (areConflicting(evidence[i], evidence[j])) {
+        conflicts.push({
+          evidence1: evidence[i],
+          evidence2: evidence[j],
+          severity: computeConflictSeverity(evidence[i], evidence[j])
+        });
+      }
+    }
+  }
+  
+  return conflicts;
+}
+```
+
+**Conflict Resolution Strategy:**
+
+1. **Acknowledge the conflict**: Explicitly state that evidence is conflicting.
+2. **Present both sides**: Show the evidence from each source.
+3. **Assess relative weight**: Compare the weight, density, and freshness of each side.
+4. **Recommend further investigation**: Suggest that the coach gather more information.
+5. **Avoid premature conclusions**: Do not make recommendations based on conflicting evidence.
+
+**Example of Handling Conflicting Evidence:**
+```
+CONFLICT DETECTED:
+
+Evidence A (Session notes, 2026-07-20):
+"The student reported feeling motivated and engaged."
+Weight: 0.85, Freshness: 0.95
+
+Evidence B (Task completion data, 2026-07-15 to 2026-07-21):
+"Task completion dropped from 80% to 40%."
+Weight: 0.90, Freshness: 0.90
+
+RESOLUTION:
+The evidence is conflicting. The student reports high motivation, but task completion has declined.
+This may indicate:
+- External factors affecting task completion (e.g., increased workload, personal issues)
+- Misalignment between perceived effort and actual output
+- Need for further investigation
+
+RECOMMENDATION:
+Discuss the discrepancy with the student in the next session. Explore potential barriers to task completion despite high motivation.
+```
+
+---
+
+## 15. Confidence Model v2
+
+The Confidence Model v2 extends the original model (Section 9) with additional factors for more nuanced confidence assessment.
+
+### 15.1 Confidence Factors
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| **Data Availability** | 20% | What percentage of expected data sources are available? |
+| **Grounding** | 20% | What percentage of claims are grounded in supplied data? |
+| **Safety** | 10% | Did the output pass safety checks (no diagnosis, no labels)? |
+| **Evidence Density** | 15% | How much evidence is available for the claims? |
+| **Evidence Freshness** | 10% | How current is the evidence? |
+| **Pattern Consistency** | 10% | How consistent are the identified patterns? |
+| **Output Validation** | 15% | Did the output pass validation checks (structure, tone, length)? |
+
+### 15.2 Factor Details
+
+#### 15.2.1 Data Availability (20%)
+
+**Definition:** Percentage of expected data sources that are available.
+
+**Calculation:**
+```typescript
+function computeDataAvailability(availability: DataAvailabilityFlags): number {
+  const totalSources = Object.keys(availability).length;
+  const availableSources = Object.values(availability).filter(Boolean).length;
+  return availableSources / totalSources;
+}
+```
+
+**Interpretation:**
+- 1.0: All expected sources available
+- 0.8: Most sources available
+- 0.5: Half of sources available
+- 0.2: Few sources available
+
+#### 15.2.2 Grounding (20%)
+
+**Definition:** Percentage of claims that are grounded in supplied data.
+
+**Calculation:**
+```typescript
+function computeGrounding(output: AIOutput, context: ReportContext): number {
+  const claims = extractClaims(output.text);
+  const groundedClaims = claims.filter(claim => isGrounded(claim, context));
+  return groundedClaims.length / claims.length;
+}
+```
+
+**Interpretation:**
+- 1.0: All claims grounded
+- 0.9: Most claims grounded
+- 0.7: Some claims ungrounded
+- 0.5: Half of claims ungrounded
+
+#### 15.2.3 Safety (10%)
+
+**Definition:** Binary score (0 or 1) based on whether the output passed safety checks.
+
+**Calculation:**
+```typescript
+function computeSafety(output: AIOutput): number {
+  const violations = scanForSafetyViolations(output.text);
+  return violations.length === 0 ? 1 : 0;
+}
+```
+
+**Interpretation:**
+- 1.0: No safety violations
+- 0.0: Safety violations detected
+
+#### 15.2.4 Evidence Density (15%)
+
+**Definition:** Average evidence density across all claims.
+
+**Calculation:**
+```typescript
+function computeEvidenceDensity(output: AIOutput, context: ReportContext): number {
+  const claims = extractClaims(output.text);
+  const densities = claims.map(claim => computeClaimDensity(claim, context));
+  return densities.reduce((sum, d) => sum + d, 0) / densities.length;
+}
+```
+
+**Interpretation:**
+- 1.0: High density (abundant evidence)
+- 0.7: Medium density (adequate evidence)
+- 0.4: Low density (limited evidence)
+- 0.2: Very low density (insufficient evidence)
+
+#### 15.2.5 Evidence Freshness (10%)
+
+**Definition:** Average evidence freshness across all claims.
+
+**Calculation:**
+```typescript
+function computeEvidenceFreshness(output: AIOutput, context: ReportContext): number {
+  const claims = extractClaims(output.text);
+  const fresh
 
 | Term | Definition |
 |------|------------|

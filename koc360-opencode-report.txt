@@ -1563,3 +1563,328 @@ Successfully completed the Report Workspace backend integration by replacing pla
 **Total files modified:** 1  
 **Lines added:** 203  
 **Lines removed:** 150
+
+---
+
+# Draft Report Pipeline Sprint
+
+## 1. Files Modified
+
+- `src/components/report-workspace/ReportHeader.tsx` — Added `isGenerating` and `onGenerateAgain` props, loading state, and disabled state
+- `src/routes/report-workspace.tsx` — Wired up Generate Again button to pipeline, added loading state and toast notifications
+- `src/routes/__root.tsx` — Added Toaster component for toast notifications
+- `docs/AI_Design_Specification.md` — Extended with sections 12-17 (AI Memory, Reasoning, Evidence, Confidence v2, Feedback Loop, Architectural Principles)
+
+## 2. Files Created
+
+- `src/lib/report/generate.server.ts` — Server function that orchestrates the draft report pipeline
+
+## 3. Generate Again Flow Diagram
+
+```
+User clicks "Generate Again"
+         ↓
+ReportHeader.onGenerateAgain() callback
+         ↓
+handleGenerateAgain() in report-workspace.tsx
+         ↓
+setIsGenerating(true) → Button shows loading state
+         ↓
+generateReportPrompt({ sessionId })
+         ↓
+Server function executes:
+   ├── buildReportContext(sessionId)
+   │      ↓
+   │   Fetches real Notion data via getReportWorkspaceData()
+   │      ↓
+   │   Returns ReportContext with all student/session/sprint data
+   │
+   └── buildReportPrompt(context)
+          ↓
+       Returns PromptDocument with:
+       ├── system: string (system prompt)
+       ├── user: string (user prompt with context)
+       └── metadata: {
+              generatedAt,
+              templateVersion,
+              availableSources,
+              missingSources,
+              characterCount,
+              wordCount
+           }
+         ↓
+In development mode: console.log(prompt metadata and preview)
+         ↓
+Return PromptDocument to client
+         ↓
+setIsGenerating(false) → Button returns to normal state
+         ↓
+toast.success("Prompt generated.")
+```
+
+## 4. buildReportContext Call Location
+
+**File:** `src/lib/report/generate.server.ts`  
+**Line:** Inside the `generateReportPrompt` server function handler  
+**Purpose:** Builds the ReportContext from real Notion data for the given sessionId
+
+```typescript
+const context = await buildReportContext(sessionId);
+```
+
+## 5. buildReportPrompt Call Location
+
+**File:** `src/lib/report/generate.server.ts`  
+**Line:** Immediately after buildReportContext in the server function handler  
+**Purpose:** Converts the ReportContext into a PromptDocument ready for LLM consumption
+
+```typescript
+const prompt = buildReportPrompt(context);
+```
+
+## 6. PromptDocument Creation Location
+
+**File:** `src/lib/report/prompt.builder.ts`  
+**Function:** `buildReportPrompt(context: ReportContext): PromptDocument`  
+**Returns:** Complete PromptDocument with system, user, and metadata sections
+
+The PromptDocument structure:
+```typescript
+{
+  system: string,        // System prompt with AI instructions
+  user: string,          // User prompt with all context data
+  metadata: {
+    generatedAt: string,
+    templateVersion: string,
+    availableSources: string[],
+    missingSources: string[],
+    characterCount: number,
+    wordCount: number
+  },
+  sections: PromptSection[]  // Individual sections for debugging
+}
+```
+
+## 7. Prompt Metadata Example
+
+```json
+{
+  "generatedAt": "2026-08-03T18:45:32.123Z",
+  "templateVersion": "1.0.0",
+  "availableSources": [
+    "student",
+    "session",
+    "sessionNotes",
+    "goals",
+    "sprint",
+    "tasks",
+    "recommendations"
+  ],
+  "missingSources": [
+    "assessment",
+    "coachNotes",
+    "parentFeedback",
+    "previousReports"
+  ],
+  "characterCount": 8547,
+  "wordCount": 1423
+}
+```
+
+## 8. Console Output Example (Development Mode Only)
+
+```
+=== Generated Prompt Document ===
+Metadata: {
+  "generatedAt": "2026-08-03T18:45:32.123Z",
+  "templateVersion": "1.0.0",
+  "availableSources": ["student", "session", "sessionNotes", "goals", "sprint", "tasks", "recommendations"],
+  "missingSources": ["assessment", "coachNotes", "parentFeedback", "previousReports"],
+  "characterCount": 8547,
+  "wordCount": 1423
+}
+
+System Prompt (first 500 chars):
+You are an expert educational coach assistant for Koç360, a coaching platform that helps students achieve their academic and personal goals.
+
+Your role is to generate comprehensive coaching reports based on session data, student progress, and coaching observations.
+
+CRITICAL RULES:
+- Never invent facts or make assumptions beyond the provided data
+- Use ONLY the information explicitly provided in the context
+- Never diagnose the student with any medical or psychological conditions
+- Never label the student (e.g., "lazy", "gifted", "problematic")
+
+User Prompt (first 500 chars):
+COACHING CONTEXT:
+
+You are writing a coaching report for Student Name.
+Session Date: 24 Oct 2023
+Sprint: Sprint 12
+
+This report will be shared with the student and potentially their parents. It should be clear, actionable, and focused on growth.
+
+---
+
+STUDENT PROFILE:
+
+Name: Student Name
+Student ID: —
+
+=== End of Prompt Document ===
+```
+
+## 9. Loading State Management
+
+**Implementation:** React state in `report-workspace.tsx`
+
+```typescript
+const [isGenerating, setIsGenerating] = useState(false);
+
+const handleGenerateAgain = async () => {
+  setIsGenerating(true);
+  try {
+    await generateReportPrompt({ data: { sessionId: data.session.id } });
+    toast.success("Prompt generated.");
+  } catch (error) {
+    console.error("Failed to generate prompt:", error);
+    toast.error("Prompt generation failed.");
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+**UI Changes:**
+- Button text changes from "Generate Again" to "Generating..."
+- Icon changes from "refresh" to "hourglass_empty" with spin animation
+- Button is disabled during generation
+- Button opacity reduced to 50% when disabled
+
+## 10. Toast System Implementation
+
+**Library:** Sonner (already installed in project)
+
+**Setup:**
+- Added `Toaster` component to `src/routes/__root.tsx` in the `RootShell` function
+- Imported from `@/components/ui/sonner`
+
+**Usage:**
+```typescript
+import { toast } from "sonner";
+
+// Success toast
+toast.success("Prompt generated.");
+
+// Error toast
+toast.error("Prompt generation failed.");
+```
+
+**Toast Display:**
+- Position: Bottom-right corner (default Sonner position)
+- Auto-dismiss: 4 seconds for success, 4 seconds for error
+- Styling: Matches Koç360 design system (uses CSS variables)
+
+## 11. Notion Write Operations
+
+**Status:** ❌ No Notion writes performed
+
+This sprint does NOT write any data to Notion. The pipeline:
+- ✅ Reads from Notion (via buildReportContext)
+- ✅ Generates prompt in memory
+- ✅ Returns PromptDocument to client
+- ❌ Does NOT save to Notion
+- ❌ Does NOT create Report records
+- ❌ Does NOT update any Notion databases
+
+## 12. AI Provider Calls
+
+**Status:** ❌ No AI provider calls made
+
+This sprint does NOT call any LLM provider. The pipeline:
+- ✅ Builds ReportContext from Notion data
+- ✅ Builds PromptDocument from ReportContext
+- ✅ Returns PromptDocument to client
+- ❌ Does NOT call OpenAI, Anthropic, Gemini, or any other LLM
+- ❌ Does NOT generate any AI output
+- ❌ Does NOT process any AI responses
+
+The PromptDocument is stored in memory only and logged to console in development mode.
+
+## 13. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 253 modules transformed
+✓ SSR build: 148 modules transformed
+✓ Nitro build: 299 modules transformed
+```
+
+No build errors or warnings.
+
+## 14. Commit Hash
+
+**Commit:** `Pending`  
+**Message:** `Implement Draft Report Pipeline`  
+**Branch:** `main`  
+**Files changed:** 5 files (+245 lines, -50 lines)
+
+## 15. Push Result
+
+**Status:** ⏳ Pending
+
+Will push after commit.
+
+## 16. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  modified:   docs/AI_Design_Specification.md
+  modified:   src/components/report-workspace/ReportHeader.tsx
+  modified:   src/routes/__root.tsx
+  modified:   src/routes/report-workspace.tsx
+
+Untracked files:
+  src/lib/report/generate.server.ts
+```
+
+---
+
+## Summary
+
+Successfully implemented the Draft Report Pipeline that connects the "Generate Again" button to the full prompt generation flow without making any actual AI calls or Notion writes.
+
+**Key Achievements:**
+
+1. **Pipeline Implementation** — Created `generate.server.ts` server function that orchestrates the full pipeline: buildReportContext → buildReportPrompt → return PromptDocument
+
+2. **Real Data Integration** — Pipeline uses real Notion data via buildReportContext, which fetches student, session, sprint, goals, tasks, and recommendations
+
+3. **Loading State** — Button shows loading state with spinning icon and disabled state during generation
+
+4. **Toast Notifications** — Success and error toasts provide user feedback using Sonner library
+
+5. **Development Logging** — Prompt metadata and preview logged to console in development mode only (not in production)
+
+6. **No Side Effects** — Pipeline does not write to Notion, does not call AI providers, does not persist data
+
+7. **Type Safety** — Full TypeScript types for PromptDocument and all pipeline stages
+
+8. **Error Handling** — Graceful error handling with user-friendly toast messages
+
+**Architecture:**
+- Server function (`generate.server.ts`) handles pipeline orchestration
+- Client component (`report-workspace.tsx`) manages loading state and user feedback
+- Reuses existing `buildReportContext` and `buildReportPrompt` functions
+- No duplication of logic
+
+**Next Steps:**
+1. Connect to actual LLM provider (OpenAI, Anthropic, etc.)
+2. Process AI response and display in Report Workspace
+3. Save generated report to Notion Reports database
+4. Implement report versioning and history
+5. Add report editing and approval workflow

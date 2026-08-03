@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toast } from "sonner";
 import { ReportShell } from "@/components/report-workspace/ReportShell";
 import { ReportHeader } from "@/components/report-workspace/ReportHeader";
 import { AISummaryCard } from "@/components/report-workspace/AISummaryCard";
@@ -18,41 +20,10 @@ import {
   getVersionHistory,
 } from "@/lib/report/report.mapper";
 import type { ReportWorkspaceData } from "@/lib/report/report.types";
-import { buildReportContext } from "@/lib/report/context.server";
-import { buildReportPrompt } from "@/lib/report/prompt.builder";
+import { generateReportPrompt } from "@/lib/report/generate.server";
 
 const loadReportWorkspace = createServerFn({ method: "GET" }).handler(
   async (): Promise<ReportWorkspaceData> => {
-    // Temporary test: Build and log a prompt from a real session
-    // This will be removed after testing
-    try {
-      // Try to build a context from a test session ID
-      // Note: This will fail if the session doesn't exist in your Notion database
-      // You may need to replace this with a real session ID from your database
-      const testSessionId = "test-session-id"; // Replace with actual session ID
-      
-      console.log("[Prompt Builder Test] Building ReportContext...");
-      const context = await buildReportContext(testSessionId);
-      
-      console.log("[Prompt Builder Test] Building prompt...");
-      const prompt = buildReportPrompt(context);
-      
-      console.log("[Prompt Builder Test] Generated prompt:");
-      console.log("System prompt length:", prompt.system.length, "characters");
-      console.log("User prompt length:", prompt.user.length, "characters");
-      console.log("Total word count:", prompt.metadata.wordCount);
-      console.log("Available sources:", prompt.metadata.availableSources);
-      console.log("Missing sources:", prompt.metadata.missingSources);
-      console.log("\n--- SYSTEM PROMPT ---\n");
-      console.log(prompt.system);
-      console.log("\n--- USER PROMPT (first 2000 chars) ---\n");
-      console.log(prompt.user.substring(0, 2000));
-      console.log("\n--- END PROMPT PREVIEW ---\n");
-    } catch (error) {
-      console.log("[Prompt Builder Test] Could not build prompt from real data:", error instanceof Error ? error.message : error);
-      console.log("[Prompt Builder Test] This is expected if using placeholder data or invalid session ID");
-    }
-    
     return await getReportWorkspaceData();
   },
 );
@@ -75,9 +46,23 @@ export const Route = createFileRoute("/report-workspace")({
 
 function ReportWorkspacePage() {
   const data = Route.useLoaderData() as ReportWorkspaceData;
+  const [isGenerating, setIsGenerating] = useState(false);
   const usedSources = getUsedSources(data);
   const missingSources = getMissingSources(data);
   const versionHistory = getVersionHistory(data);
+
+  const handleGenerateAgain = async () => {
+    setIsGenerating(true);
+    try {
+      await generateReportPrompt({ data: { sessionId: data.session.id } });
+      toast.success("Prompt generated.");
+    } catch (error) {
+      console.error("Failed to generate prompt:", error);
+      toast.error("Prompt generation failed.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <ReportShell reportStatus={data.report.metadata.reportStatus}>
@@ -92,6 +77,8 @@ function ReportWorkspacePage() {
         reportStatus={data.report.metadata.reportStatus}
         draftLabel={data.report.metadata.draftLabel}
         reviewLabel={data.report.metadata.reviewLabel}
+        isGenerating={isGenerating}
+        onGenerateAgain={handleGenerateAgain}
       />
 
       <div className="max-w-[1400px] mx-auto p-4 grid grid-cols-12 gap-4">

@@ -13,6 +13,8 @@ interface ReportHeaderProps {
   reportStatus: ReportStatus;
   draftLabel: string;
   reviewLabel: string;
+  isGenerating?: boolean;
+  onGenerateAgain?: () => void;
 }
 
 export function ReportHeader({
@@ -26,6 +28,8 @@ export function ReportHeader({
   reportStatus,
   draftLabel,
   reviewLabel,
+  isGenerating = false,
+  onGenerateAgain,
 }: ReportHeaderProps) {
   return (
     <section className="bg-surface border-b border-outline-variant p-6 sticky top-16 z-10">
@@ -83,10 +87,12 @@ export function ReportHeader({
             </div>
             <button
               type="button"
-              className="border border-outline px-3 py-1.5 text-xs font-mono font-semibold hover:bg-surface-container transition-colors flex items-center gap-1"
+              onClick={onGenerateAgain}
+              disabled={isGenerating}
+              className="border border-outline px-3 py-1.5 text-xs font-mono font-semibold hover:bg-surface-container transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Icon name="refresh" className="text-sm" />
-              Generate Again
+              <Icon name={isGenerating ? "hourglass_empty" : "refresh"} className={`text-sm ${isGenerating ? "animate-spin" : ""}`} />
+              {isGenerating ? "Generating..." : "Generate Again"}
             </button>
           </div>
         </div>
