@@ -5,6 +5,24 @@ import type {
   ReportVersion,
   ReportActions,
 } from "./report.types";
+import {
+  fetchSessions,
+  fetchGoals,
+  fetchSprints,
+  fetchAssessments,
+  fetchTasks,
+  fetchAIRecommendations,
+} from "@/lib/notion/queries.server";
+import { getStudentProfileData } from "@/lib/students/profile.server";
+import {
+  extractDate,
+  extractRelationIds,
+  extractSelect,
+  extractTitle,
+  extractRichText,
+  extractNumber,
+  extractCheckbox,
+} from "@/lib/notion/transformers";
 
 // ============================================================================
 // TODO: Future Notion Integration — Session Notes
@@ -112,251 +130,7 @@ import type {
 // - Include as ReportSource with type "ai_output"
 // ============================================================================
 
-function getPlaceholderSources(): ReportSource[] {
-  return [
-    {
-      id: "src-session-notes",
-      title: "Session Notes",
-      status: "available",
-      priority: "required",
-      description: "Wins, challenges, core notes, and commitments from the session",
-      isRequired: true,
-      isMissing: false,
-      sourceType: "session_notes",
-    },
-    {
-      id: "src-sprint-log",
-      title: "Sprint Log",
-      status: "available",
-      priority: "required",
-      description: "Sprint goals, progress, and completion data",
-      isRequired: true,
-      isMissing: false,
-      sourceType: "sprint_log",
-    },
-    {
-      id: "src-tasks",
-      title: "Tasks",
-      status: "available",
-      priority: "required",
-      description: "Task completion and overdue items",
-      isRequired: true,
-      isMissing: false,
-      sourceType: "tasks",
-    },
-    {
-      id: "src-assessment",
-      title: "Assessment",
-      status: "available",
-      priority: "required",
-      description: "Latest student assessment results",
-      isRequired: true,
-      isMissing: false,
-      sourceType: "assessment",
-    },
-    {
-      id: "src-commitments",
-      title: "Commitments",
-      status: "available",
-      priority: "recommended",
-      description: "Student commitments from previous sessions",
-      isRequired: false,
-      isMissing: false,
-      sourceType: "commitments",
-    },
-    {
-      id: "src-parent-feedback",
-      title: "Parent Feedback",
-      status: "missing",
-      priority: "optional",
-      description: "Parent observations and feedback for this sprint",
-      isRequired: false,
-      isMissing: true,
-      sourceType: "parent_feedback",
-    },
-    {
-      id: "src-latest-assessment",
-      title: "Latest Assessment",
-      status: "missing",
-      priority: "recommended",
-      description: "Most recent standardized assessment scores",
-      isRequired: false,
-      isMissing: true,
-      sourceType: "assessment",
-    },
-  ];
-}
 
-function getPlaceholderConfidence(): ReportConfidence {
-  return {
-    confidence: 88,
-    missingSources: ["Parent goals for this sprint are not updated."],
-    warnings: [],
-    suggestions: ['Ask the student about "Math Anxiety" for deeper analysis.'],
-    readiness: 92,
-  };
-}
-
-function getPlaceholderVersions(): ReportVersion[] {
-  return [
-    {
-      id: "ver-001",
-      createdAt: "OCT 26, 09:15",
-      createdBy: "Parent",
-      status: "viewed",
-      version: 6,
-      publishedAt: null,
-      publishedFor: null,
-      timelineDescription: "Viewed",
-    },
-    {
-      id: "ver-002",
-      createdAt: "OCT 25, 18:00",
-      createdBy: "System",
-      status: "shared",
-      version: 5,
-      publishedAt: null,
-      publishedFor: null,
-      timelineDescription: "Shared with Parent",
-    },
-    {
-      id: "ver-003",
-      createdAt: "OCT 25, 17:45",
-      createdBy: "Coach Sarah",
-      status: "published",
-      version: 4,
-      publishedAt: "OCT 25, 17:45",
-      publishedFor: "Parent",
-      timelineDescription: "Published",
-    },
-    {
-      id: "ver-004",
-      createdAt: "OCT 25, 16:20",
-      createdBy: "Head Coach",
-      status: "approved",
-      version: 3,
-      publishedAt: null,
-      publishedFor: null,
-      timelineDescription: "Approved",
-    },
-    {
-      id: "ver-005",
-      createdAt: "OCT 25, 14:30",
-      createdBy: "Coach Sarah",
-      status: "edited",
-      version: 2,
-      publishedAt: null,
-      publishedFor: null,
-      timelineDescription: "Coach Edited",
-    },
-    {
-      id: "ver-006",
-      createdAt: "OCT 25, 14:00",
-      createdBy: "System",
-      status: "created",
-      version: 1,
-      publishedAt: null,
-      publishedFor: null,
-      timelineDescription: "AI Draft Created",
-    },
-  ];
-}
-
-function getPlaceholderReportWorkspaceData(): ReportWorkspaceData {
-  return {
-    report: {
-      id: "report-placeholder-001",
-      title: "Sprint 12 Progress Report",
-      metadata: {
-        completionPercent: 92,
-        readingTimeMinutes: 2,
-        lastGeneratedAt: "24 Oct, 14:35",
-        reportStatus: "reviewing",
-        draftLabel: "Draft",
-        reviewLabel: "Reviewing",
-      },
-      summary: [
-        {
-          label: "Current Status",
-          content:
-            "The student has shown significant progress in Sprint 12, specifically regarding focus on college application deadlines. Engagement improved from 'passive' to 'active'.",
-        },
-        {
-          label: "Key Insight",
-          content:
-            "AI analysis suggests a 15% increase in task completion rate, indicating a strong shift towards self-regulation.",
-        },
-        {
-          label: "Recommended Focus",
-          content:
-            "Maintain momentum through the upcoming physics project while introducing structured morning routines.",
-        },
-      ],
-      strengths: [
-        "Strong ownership",
-        "Improved consistency",
-        "Self-directed learning",
-        "Exam resilience",
-      ],
-      challenges: [
-        "Morning fatigue",
-        "Exam anxiety",
-        "Low accountability",
-        "Time management",
-      ],
-      coachNotes:
-        "The student seemed distracted when discussing the physics project. A follow-up session focusing purely on project breakdown steps may be needed to avoid overwhelm.",
-      sprintFocus: [
-        {
-          title: "Finalize Physics Lab Report",
-          detail: "Deadline: Nov 2nd",
-        },
-        {
-          title: "Mock TOEFL Test - Session 1",
-          detail: "Preparation: Review vocabulary lists",
-        },
-      ],
-      versions: getPlaceholderVersions(),
-    },
-    student: {
-      id: "student-placeholder-001",
-      name: "Student Name",
-    },
-    session: {
-      id: "session-placeholder-001",
-      date: "24 Oct 2023",
-    },
-    assessment: {
-      id: null,
-      title: null,
-    },
-    goals: {
-      items: [],
-    },
-    sprint: {
-      id: "sprint-placeholder-001",
-      name: "Sprint 12",
-      goal: "Academic Resilience & Time Mgmt",
-    },
-    tasks: {
-      items: [],
-    },
-    recommendations: {
-      items: [],
-    },
-    sources: {
-      items: getPlaceholderSources(),
-    },
-    confidence: getPlaceholderConfidence(),
-    publishing: {
-      readiness: 92,
-      readinessLabel: "Ready to Publish",
-    },
-    history: {
-      versions: getPlaceholderVersions(),
-    },
-  };
-}
 
 // ============================================================================
 // TODO: Future Report Actions Implementation
@@ -401,18 +175,345 @@ function getPlaceholderActions(): ReportActions {
 }
 
 export async function getReportWorkspaceData(): Promise<ReportWorkspaceData> {
-  // TODO: Replace placeholder with real data fetching
-  // 1. Fetch student profile from Notion
-  // 2. Fetch session data from Notion
-  // 3. Fetch sprint data from Notion
-  // 4. Fetch goals, tasks, assessments from Notion
-  // 5. Fetch AI recommendations from Notion
-  // 6. Fetch previous reports from Notion
-  // 7. Fetch coach notes from Notion
-  // 8. Compute sources availability
-  // 9. Compute confidence score
-  // 10. Fetch version history
-  return getPlaceholderReportWorkspaceData();
+  // Fetch the most recent session to use as context
+  const sessionsResult = await fetchSessions();
+  if (!sessionsResult.ok) {
+    throw new Error(`Sessions could not be loaded: ${sessionsResult.message}`);
+  }
+
+  // Get the most recent session (sort by date descending)
+  const sessions = sessionsResult.data.sort((a, b) => {
+    const dateA = extractDate(a.properties, "Session Date");
+    const dateB = extractDate(b.properties, "Session Date");
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+  });
+
+  const sessionPage = sessions[0];
+  if (!sessionPage) {
+    throw new Error("No sessions found.");
+  }
+
+  const p = sessionPage.properties;
+  const studentIds = extractRelationIds(p, "Student");
+  const studentId = studentIds[0];
+
+  if (!studentId) {
+    throw new Error("No student associated with this session.");
+  }
+
+  // Fetch student profile data
+  const profile = await getStudentProfileData(studentId);
+
+  // Extract session data
+  const sessionDate = extractDate(p, "Session Date") || "Unknown date";
+  const sessionTitle = extractTitle(p, "Session") || "Untitled Session";
+
+  // Get active sprint (first sprint with "Active" status)
+  const activeSprint = profile.sprints.find(
+    (s) => s.status?.toLowerCase() === "active"
+  );
+
+  // Get active goal (first goal that's not done)
+  const activeGoal = profile.goals.find(
+    (g) => g.status?.toLowerCase() !== "completed" && g.status?.toLowerCase() !== "done"
+  );
+
+  // Get recent assessment (most recent by date)
+  const recentAssessment = [...profile.assessments]
+    .filter((a) => a.date)
+    .sort((a, b) => new Date(b.date!).getTime() - new Date(a.date!).getTime())[0];
+
+  // Get pending recommendations
+  const pendingRecommendations = profile.aiRecommendations.filter(
+    (r) => r.status?.toLowerCase() === "pending"
+  );
+
+  // Get overdue tasks
+  const overdueTasks = profile.tasks.filter((t) => {
+    if (!t.date) return false;
+    const status = t.status?.toLowerCase();
+    if (status === "completed" || status === "done") return false;
+    return new Date(t.date) < new Date();
+  });
+
+  // Compute sources availability
+  const sources: ReportSource[] = [];
+
+  // Session Notes - always available if we have a session
+  sources.push({
+    id: "src-session-notes",
+    title: "Session Notes",
+    status: "available",
+    priority: "required",
+    description: "Wins, challenges, core notes, and commitments from the session",
+    isRequired: true,
+    isMissing: false,
+    sourceType: "session_notes",
+  });
+
+  // Sprint Log - available if we have an active sprint
+  if (activeSprint) {
+    sources.push({
+      id: "src-sprint-log",
+      title: "Sprint Log",
+      status: "available",
+      priority: "required",
+      description: "Sprint goals, progress, and completion data",
+      isRequired: true,
+      isMissing: false,
+      sourceType: "sprint_log",
+    });
+  }
+
+  // Tasks - available if we have tasks
+  if (profile.tasks.length > 0) {
+    sources.push({
+      id: "src-tasks",
+      title: "Tasks",
+      status: "available",
+      priority: "required",
+      description: "Task completion and overdue items",
+      isRequired: true,
+      isMissing: false,
+      sourceType: "tasks",
+    });
+  }
+
+  // Assessment - available if we have assessments
+  if (recentAssessment) {
+    sources.push({
+      id: "src-assessment",
+      title: "Assessment",
+      status: "available",
+      priority: "required",
+      description: "Latest student assessment results",
+      isRequired: true,
+      isMissing: false,
+      sourceType: "assessment",
+    });
+  }
+
+  // Goals - available if we have goals
+  if (activeGoal) {
+    sources.push({
+      id: "src-goals",
+      title: "Goals",
+      status: "available",
+      priority: "recommended",
+      description: "Active student goals and progress",
+      isRequired: false,
+      isMissing: false,
+      sourceType: "goals",
+    });
+  }
+
+  // Commitments - available if we have commitments from session
+  const commitments = extractRichText(p, "Commitments");
+  if (commitments) {
+    sources.push({
+      id: "src-commitments",
+      title: "Commitments",
+      status: "available",
+      priority: "recommended",
+      description: "Student commitments from previous sessions",
+      isRequired: false,
+      isMissing: false,
+      sourceType: "commitments",
+    });
+  }
+
+  // Parent Feedback - not yet implemented
+  sources.push({
+    id: "src-parent-feedback",
+    title: "Parent Feedback",
+    status: "missing",
+    priority: "optional",
+    description: "Parent observations and feedback for this sprint",
+    isRequired: false,
+    isMissing: true,
+    sourceType: "parent_feedback",
+  });
+
+  // Coach Notes - not yet implemented
+  sources.push({
+    id: "src-coach-notes",
+    title: "Coach Notes",
+    status: "missing",
+    priority: "optional",
+    description: "Private coach observations and notes",
+    isRequired: false,
+    isMissing: true,
+    sourceType: "coach_notes",
+  });
+
+  // AI Output - not yet implemented
+  sources.push({
+    id: "src-ai-output",
+    title: "AI Output",
+    status: "missing",
+    priority: "optional",
+    description: "AI-generated summaries and insights",
+    isRequired: false,
+    isMissing: true,
+    sourceType: "ai_output",
+  });
+
+  // Compute confidence based on available sources
+  const availableSources = sources.filter((s) => !s.isMissing).length;
+  const totalRequiredSources = sources.filter((s) => s.isRequired).length;
+  const availableRequiredSources = sources.filter(
+    (s) => s.isRequired && !s.isMissing
+  ).length;
+
+  const confidence = Math.round(
+    (availableRequiredSources / Math.max(totalRequiredSources, 1)) * 100
+  );
+
+  const missingSourcesMessages: string[] = [];
+  if (!activeSprint) missingSourcesMessages.push("No active sprint found");
+  if (!recentAssessment) missingSourcesMessages.push("No recent assessment found");
+  if (profile.tasks.length === 0) missingSourcesMessages.push("No tasks found");
+  if (!activeGoal) missingSourcesMessages.push("No active goal found");
+
+  // Compute publishing readiness
+  const readiness = Math.round(
+    (availableSources / Math.max(sources.length, 1)) * 100
+  );
+
+  const readinessLabel =
+    readiness >= 90
+      ? "Ready to Publish"
+      : readiness >= 70
+        ? "Nearly Ready"
+        : readiness >= 50
+          ? "Needs More Data"
+          : "Insufficient Data";
+
+  // Build summary sections
+  const summary: Array<{ label: string; content: string }> = [];
+
+  if (activeSprint) {
+    summary.push({
+      label: "Current Status",
+      content: `Student is working on ${activeSprint.title}${activeSprint.progress !== null ? ` with ${activeSprint.progress}% progress` : ""}.`,
+    });
+  }
+
+  if (overdueTasks.length > 0) {
+    summary.push({
+      label: "Overdue Tasks",
+      content: `${overdueTasks.length} task${overdueTasks.length === 1 ? "" : "s"} overdue: ${overdueTasks.slice(0, 3).map((t) => t.title).join(", ")}${overdueTasks.length > 3 ? "..." : ""}`,
+    });
+  }
+
+  if (pendingRecommendations.length > 0) {
+    summary.push({
+      label: "Pending Recommendations",
+      content: `${pendingRecommendations.length} AI recommendation${pendingRecommendations.length === 1 ? "" : "s"} pending review.`,
+    });
+  }
+
+  return {
+    report: {
+      id: `report-${sessionPage.id}`,
+      title: `${sessionTitle} Report`,
+      metadata: {
+        completionPercent: confidence,
+        readingTimeMinutes: 2,
+        lastGeneratedAt: new Date().toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        reportStatus: "reviewing",
+        draftLabel: "Draft",
+        reviewLabel: "Reviewing",
+      },
+      summary,
+      strengths: [], // Will be populated by AI generation
+      challenges: [], // Will be populated by AI generation
+      coachNotes: "", // Not yet implemented - placeholder for future Coach Notes database
+      sprintFocus: activeSprint
+        ? [
+            {
+              title: activeSprint.title,
+              detail: activeSprint.detail || "Focus area for current sprint",
+            },
+          ]
+        : [],
+      versions: [], // Not yet implemented - placeholder for future Reports database
+    },
+    student: {
+      id: profile.student.id,
+      name: profile.student.name,
+    },
+    session: {
+      id: sessionPage.id,
+      date: sessionDate,
+    },
+    assessment: recentAssessment
+      ? {
+          id: recentAssessment.id,
+          title: recentAssessment.title,
+        }
+      : {
+          id: null,
+          title: null,
+        },
+    goals: {
+      items: profile.goals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        progress: g.progress ?? null,
+      })),
+    },
+    sprint: activeSprint
+      ? {
+          id: activeSprint.id,
+          name: activeSprint.title,
+          goal: activeSprint.detail || "",
+        }
+      : {
+          id: "sprint-placeholder",
+          name: "No Active Sprint",
+          goal: "",
+        },
+    tasks: {
+      items: profile.tasks.map((t) => ({
+        id: t.id,
+        title: t.title,
+        status: t.status || "Unknown",
+      })),
+    },
+    recommendations: {
+      items: profile.aiRecommendations.map((r) => ({
+        id: r.id,
+        title: r.title,
+        detail: r.detail || "",
+      })),
+    },
+    sources: {
+      items: sources,
+    },
+    confidence: {
+      confidence,
+      missingSources: missingSourcesMessages,
+      warnings: [],
+      suggestions: [],
+      readiness,
+    },
+    publishing: {
+      readiness,
+      readinessLabel,
+    },
+    history: {
+      versions: [], // Not yet implemented - placeholder for future Reports database
+    },
+  };
 }
 
 export function getReportActions(): ReportActions {
