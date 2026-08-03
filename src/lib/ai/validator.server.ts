@@ -1,9 +1,6 @@
-import type {
-  ReportOutput,
-  ReportOutputSummary,
-  ReportOutputConfidence,
-  ReportOutputNextSprintFocusItem,
-} from "./schema";
+import { ZodError } from "zod";
+import { ReportOutputSchema } from "./report-output.schema";
+import type { ReportOutput } from "./report-output.schema";
 import type { PromptOutput } from "@/lib/report/prompt.types";
 
 export class ValidationError extends Error {
@@ -16,8 +13,18 @@ export class ValidationError extends Error {
   }
 }
 
+export interface BusinessValidationIssue {
+  field: string;
+  message: string;
+  severity: "error" | "warning";
+}
+
+export interface ValidationResult {
+  output: ReportOutput;
+  businessIssues: BusinessValidationIssue[];
+}
+
 export function validateReportOutput(output: PromptOutput): ReportOutput {
-  const errors: string[] = [];
   const text = output.text.trim();
 
   if (!text) {
@@ -27,164 +34,128 @@ export function validateReportOutput(output: PromptOutput): ReportOutput {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
-  } catch (e) {
+  } catch {
     throw new ValidationError("Response is not valid JSON", [
       "Response could not be parsed as JSON",
     ]);
   }
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new ValidationError("Response is not a JSON object", [
-      "Response must be a JSON object",
-    ]);
-  }
+  const zodResult = ReportOutputSchema.safeParse(parsed);
 
-  const obj = parsed as Record<string, unknown>;
-
-  const summary = validateSummary(obj.summary, errors);
-  const strengths = validateStringArray(obj.strengths, "strengths", errors);
-  const challenges = validateStringArray(obj.challenges, "challenges", errors);
-  const coachNotes = validateString(obj.coachNotes, "coachNotes", errors);
-  const nextSprintFocus = validateNextSprintFocus(
-    obj.nextSprintFocus,
-    errors,
-  );
-  const confidence = validateConfidence(obj.confidence, errors);
-
-  if (errors.length > 0) {
+  if (!zodResult.success) {
+    const errors = zodResult.error.errors.map(
+      (e) => `${e.path.join(".") || "root"}: ${e.message}`,
+    );
     throw new ValidationError(
-      `Response validation failed with ${errors.length} error(s)`,
+      `Schema validation failed with ${errors.length} error(s)`,
       errors,
     );
   }
 
+  const reportOutput = zodResult.data;
+
+  const businessIssues = runBusinessValidation(reportOutput);
+  const errors = businessIssues.filter((i) => i.severity === "error");
+
+  if (errors.length > 0) {
+    throw new ValidationError(
+      `Business validation failed with ${errors.length} error(s)`,
+      errors.map((e) => `[${e.field}] ${e.message}`),
+    );
+  }
+
+  return reportOutput;
+}
+
+export function validateReportOutputWithWarnings(
+  output: PromptOutput,
+): ValidationResult {
+  const reportOutput = validateReportOutput(output);
+  const businessIssues = runBusinessValidation(reportOutput);
+
   return {
-    summary,
-    strengths,
-    challenges,
-    coachNotes,
-    nextSprintFocus,
-    confidence,
+    output: reportOutput,
+    businessIssues,
   };
 }
 
-function validateSummary(
-  value: unknown,
-  errors: string[],
-): ReportOutputSummary {
-  if (!value || typeof value !== "object") {
-    errors.push("summary is missing or not an object");
-    return { currentStatus: "", keyInsight: "", recommendedFocus: "" };
+function runBusinessValidation(output: ReportOutput): BusinessValidationIssue[] {
+  const issues: BusinessValidationIssue[] = [];
+
+  if (output.confidence.score < 0.5) {
+    issues.push({
+      field: "confidence.score",
+      message: `Confidence score ${output.confidence.score} is below 0.5 — report quality may be insufficient`,
+      severity: "warning",
+    });
   }
 
-  const obj = value as Record<string, unknown>;
-
-  const currentStatus = validateString(obj.currentStatus, "summary.currentStatus", errors);
-  const keyInsight = validateString(obj.keyInsight, "summary.keyInsight", errors);
-  const recommendedFocus = validateString(obj.recommendedFocus, "summary.recommendedFocus", errors);
-
-  return { currentStatus, keyInsight, recommendedFocus };
-}
-
-function validateStringArray(
-  value: unknown,
-  fieldName: string,
-  errors: string[],
-): string[] {
-  if (!Array.isArray(value)) {
-    errors.push(`${fieldName} is missing or not an array`);
-    return [];
+  if (output.strengths.length < 2) {
+    issues.push({
+      field: "strengths",
+      message: `Only ${output.strengths.length} strength(s) identified — consider regenerating for a more comprehensive report`,
+      severity: "warning",
+    });
   }
 
-  const result: string[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const item = value[i];
-    if (typeof item !== "string" || !item.trim()) {
-      errors.push(`${fieldName}[${i}] must be a non-empty string`);
-    } else {
-      result.push(item.trim());
+  if (output.challenges.length < 2) {
+    issues.push({
+      field: "challenges",
+      message: `Only ${output.challenges.length} challenge(s) identified — consider regenerating for a more comprehensive report`,
+      severity: "warning",
+    });
+  }
+
+  if (output.summary.currentStatus.length < 20) {
+    issues.push({
+      field: "summary.currentStatus",
+      message: "Current status is unusually short — may lack sufficient detail",
+      severity: "warning",
+    });
+  }
+
+  if (output.summary.keyInsight.length < 20) {
+    issues.push({
+      field: "summary.keyInsight",
+      message: "Key insight is unusually short — may lack sufficient detail",
+      severity: "warning",
+    });
+  }
+
+  if (output.summary.recommendedFocus.length < 20) {
+    issues.push({
+      field: "summary.recommendedFocus",
+      message: "Recommended focus is unusually short — may lack sufficient detail",
+      severity: "warning",
+    });
+  }
+
+  if (output.nextSprintFocus.length === 0) {
+    issues.push({
+      field: "nextSprintFocus",
+      message: "No sprint focus items defined — at least one focus area is recommended",
+      severity: "warning",
+    });
+  }
+
+  for (let i = 0; i < output.nextSprintFocus.length; i++) {
+    const item = output.nextSprintFocus[i];
+    if (item.title.length > 100) {
+      issues.push({
+        field: `nextSprintFocus[${i}].title`,
+        message: "Sprint focus title is unusually long (over 100 chars)",
+        severity: "warning",
+      });
     }
   }
 
-  return result;
-}
-
-function validateString(
-  value: unknown,
-  fieldName: string,
-  errors: string[],
-): string {
-  if (typeof value !== "string" || !value.trim()) {
-    errors.push(`${fieldName} is missing or not a non-empty string`);
-    return "";
-  }
-  return value.trim();
-}
-
-function validateNextSprintFocus(
-  value: unknown,
-  errors: string[],
-): ReportOutputNextSprintFocusItem[] {
-  if (!Array.isArray(value)) {
-    errors.push("nextSprintFocus is missing or not an array");
-    return [];
+  if (output.coachNotes.length < 10) {
+    issues.push({
+      field: "coachNotes",
+      message: "Coach notes are unusually short",
+      severity: "warning",
+    });
   }
 
-  const result: ReportOutputNextSprintFocusItem[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const item = value[i];
-    if (!item || typeof item !== "object") {
-      errors.push(`nextSprintFocus[${i}] must be an object`);
-      continue;
-    }
-
-    const obj = item as Record<string, unknown>;
-    const title = typeof obj.title === "string" && obj.title.trim() ? obj.title.trim() : null;
-    const description = typeof obj.description === "string" && obj.description.trim() ? obj.description.trim() : null;
-
-    if (!title) {
-      errors.push(`nextSprintFocus[${i}].title must be a non-empty string`);
-    }
-    if (!description) {
-      errors.push(`nextSprintFocus[${i}].description must be a non-empty string`);
-    }
-
-    if (title && description) {
-      result.push({ title, description });
-    }
-  }
-
-  return result;
-}
-
-function validateConfidence(
-  value: unknown,
-  errors: string[],
-): ReportOutputConfidence {
-  if (!value || typeof value !== "object") {
-    errors.push("confidence is missing or not an object");
-    return { score: 0, missingInformation: [], suggestions: [] };
-  }
-
-  const obj = value as Record<string, unknown>;
-
-  let score = 0;
-  if (typeof obj.score !== "number" || obj.score < 0 || obj.score > 1) {
-    errors.push("confidence.score must be a number between 0 and 1");
-  } else {
-    score = obj.score;
-  }
-
-  const missingInformation = validateStringArray(
-    obj.missingInformation,
-    "confidence.missingInformation",
-    errors,
-  );
-  const suggestions = validateStringArray(
-    obj.suggestions,
-    "confidence.suggestions",
-    errors,
-  );
-
-  return { score, missingInformation, suggestions };
+  return issues;
 }

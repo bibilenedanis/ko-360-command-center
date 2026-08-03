@@ -4,6 +4,7 @@ import { buildReportPrompt } from "./prompt.builder";
 import { getLLMProvider } from "@/lib/ai/provider.factory";
 import { validateReportOutput, ValidationError } from "@/lib/ai/validator.server";
 import type { ReportOutput } from "@/lib/ai/schema";
+import { aiLogger } from "@/lib/ai/logger";
 
 export const generateReportOutput = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
@@ -14,52 +15,49 @@ export const generateReportOutput = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }): Promise<ReportOutput> => {
     const { sessionId } = data;
+    const totalStart = Date.now();
 
-    const context = await buildReportContext(sessionId);
+    try {
+      const context = await buildReportContext(sessionId);
 
-    const prompt = buildReportPrompt(context);
+      const prompt = buildReportPrompt(context);
+      aiLogger.logPromptBuilt(prompt.metadata.characterCount, prompt.metadata.wordCount);
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("\n=== Generated Prompt Document ===");
-      console.log("Metadata:", JSON.stringify(prompt.metadata, null, 2));
-      console.log("\nSystem Prompt (first 500 chars):");
-      console.log(prompt.system.substring(0, 500));
-      console.log("\nUser Prompt (first 500 chars):");
-      console.log(prompt.user.substring(0, 500));
-      console.log("\n=== End of Prompt Document ===\n");
+      const provider = getLLMProvider();
+      aiLogger.logGenerationStart(provider.providerName(), "configured", sessionId);
+      aiLogger.logProviderCall(provider.providerName(), "configured");
+
+      const providerStart = Date.now();
+      const output = await provider.generate(prompt);
+      const providerDuration = Date.now() - providerStart;
+
+      aiLogger.logResponseReceived(
+        output.model,
+        output.text.length,
+        providerDuration,
+        {
+          prompt: output.promptTokens,
+          completion: output.completionTokens,
+          total: output.totalTokens,
+        },
+      );
+
+      aiLogger.logValidationStart();
+      const validationStart = Date.now();
+      const reportOutput = validateReportOutput(output);
+      const validationDuration = Date.now() - validationStart;
+
+      aiLogger.logValidationComplete(true, validationDuration);
+
+      const totalDuration = Date.now() - totalStart;
+      aiLogger.logGenerationComplete(totalDuration);
+
+      return reportOutput;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      aiLogger.logError("generation.pipeline", errorMessage);
+      throw error;
     }
-
-    const provider = getLLMProvider();
-
-    if (process.env.NODE_ENV === "development") {
-      console.log(`\n=== Calling LLM Provider: ${provider.providerName()} ===\n`);
-    }
-
-    const output = await provider.generate(prompt);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("\n=== LLM Response Received ===");
-      console.log("Model:", output.model);
-      console.log("Tokens:", output.totalTokens);
-      console.log("Response length:", output.text.length);
-      console.log("\nRaw response (first 500 chars):");
-      console.log(output.text.substring(0, 500));
-      console.log("\n=== End of LLM Response ===\n");
-    }
-
-    const reportOutput = validateReportOutput(output);
-
-    if (process.env.NODE_ENV === "development") {
-      console.log("\n=== Validated Report Output ===");
-      console.log("Summary keys:", Object.keys(reportOutput.summary));
-      console.log("Strengths count:", reportOutput.strengths.length);
-      console.log("Challenges count:", reportOutput.challenges.length);
-      console.log("Next sprint focus count:", reportOutput.nextSprintFocus.length);
-      console.log("Confidence score:", reportOutput.confidence.score);
-      console.log("\n=== End of Validated Report Output ===\n");
-    }
-
-    return reportOutput;
   });
 
 export { ValidationError };

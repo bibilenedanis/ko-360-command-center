@@ -1,8 +1,9 @@
-import type { LLMProvider, LLMProviderConfig } from "./provider.types";
+import type { LLMProvider, LLMProviderConfig, ProviderHealthResult } from "./provider.types";
 import type { PromptDocument, PromptOutput } from "@/lib/report/prompt.types";
 import { ValidationError } from "./validator.server";
 
 const NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+const NVIDIA_MODELS_URL = "https://integrate.api.nvidia.com/v1/models";
 
 export class NvidiaProvider implements LLMProvider {
   private config: LLMProviderConfig;
@@ -74,19 +75,55 @@ export class NvidiaProvider implements LLMProvider {
     };
   }
 
-  async health(): Promise<boolean> {
+  async health(): Promise<ProviderHealthResult> {
+    const result: ProviderHealthResult = {
+      healthy: false,
+      provider: "nvidia",
+      model: this.config.model,
+      checks: {
+        apiReachable: false,
+        modelExists: false,
+        apiKeyValid: false,
+      },
+      checkedAt: new Date().toISOString(),
+    };
+
     try {
-      const response = await fetch(
-        "https://integrate.api.nvidia.com/v1/models",
-        {
-          headers: {
-            Authorization: `Bearer ${this.config.apiKey}`,
-          },
+      const modelsResponse = await fetch(NVIDIA_MODELS_URL, {
+        headers: {
+          Authorization: `Bearer ${this.config.apiKey}`,
         },
-      );
-      return response.ok;
-    } catch {
-      return false;
+      });
+
+      result.checks.apiReachable = modelsResponse.ok;
+
+      if (modelsResponse.status === 401 || modelsResponse.status === 403) {
+        result.checks.apiKeyValid = false;
+        result.error = "API key is invalid or expired";
+        return result;
+      }
+
+      result.checks.apiKeyValid = modelsResponse.ok;
+
+      if (!modelsResponse.ok) {
+        result.error = `Models endpoint returned ${modelsResponse.status}`;
+        return result;
+      }
+
+      const modelsData = await modelsResponse.json();
+      const models: Array<{ id: string }> = modelsData.data || [];
+      result.checks.modelExists = models.some((m) => m.id === this.config.model);
+
+      if (!result.checks.modelExists) {
+        result.error = `Model '${this.config.model}' not found in available models`;
+        return result;
+      }
+
+      result.healthy = true;
+    } catch (e) {
+      result.error = e instanceof Error ? e.message : "Unknown error during health check";
     }
+
+    return result;
   }
 }
