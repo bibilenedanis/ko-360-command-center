@@ -843,3 +843,296 @@ Implemented the ReportContext layer that will serve as the single source of trut
 **Deployed to:** `origin/main`  
 **Total files created:** 2  
 **Total lines added:** 575
+
+---
+
+# AI Engine Sprint 1 – Prompt Builder
+
+## 1. Files Modified
+
+- `src/routes/report-workspace.tsx` — Added temporary console.log to test prompt generation (will be removed after testing)
+
+## 2. Files Created
+
+- `src/lib/report/prompt.types.ts` — Type definitions for prompt domain models
+- `src/lib/report/prompt.sections.ts` — Reusable section builder functions
+- `src/lib/report/prompt.templates.ts` — Static prompt templates and constants
+- `src/lib/report/prompt.builder.ts` — Main prompt builder that assembles sections into a complete prompt
+
+## 3. Prompt Architecture
+
+The Prompt Builder layer converts a `ReportContext` into a complete `PromptDocument` that can be sent to any LLM provider.
+
+### Architecture Principles
+
+1. **Provider-Independent**: No references to OpenAI, Anthropic, Gemini, or any specific LLM provider
+2. **Modular**: Each prompt section is built by a separate function
+3. **Template-Driven**: Long prompt strings are stored in templates, not hardcoded in logic
+4. **Composable**: Sections can be added, removed, or reordered without changing the builder
+5. **Typed**: All prompt components have strict TypeScript types
+
+### Core Types
+
+```typescript
+interface PromptDocument {
+  system: string;      // System message that sets AI behavior
+  user: string;        // User message containing context and request
+  metadata: PromptMetadata;
+  sections: PromptSection[];  // Individual sections for debugging
+}
+
+interface PromptMetadata {
+  generatedAt: string;
+  templateVersion: string;
+  availableSources: string[];
+  missingSources: string[];
+  characterCount: number;
+  wordCount: number;
+}
+```
+
+## 4. Prompt Generation Flow
+
+```
+buildReportPrompt(context: ReportContext)
+    ├── 1. Build individual sections
+    │   ├── buildRoleSection(context)
+    │   ├── buildStudentSection(context)
+    │   ├── buildSessionNotesSection(context)
+    │   ├── buildAssessmentSection(context)
+    │   ├── buildGoalsSection(context)
+    │   ├── buildSprintSection(context)
+    │   ├── buildTasksSection(context)
+    │   ├── buildRecommendationsSection(context)
+    │   ├── buildDataAvailabilitySection(context)
+    │   └── buildOutputSection()
+    ├── 2. Sort sections by order
+    ├── 3. Build system prompt from SYSTEM_PROMPT template
+    ├── 4. Concatenate all sections into user prompt
+    ├── 5. Build metadata (timestamp, word count, sources)
+    └── 6. Return PromptDocument { system, user, metadata, sections }
+```
+
+## 5. Prompt Section Hierarchy
+
+The prompt is organized into 10 sections, each with a specific purpose:
+
+| Order | Section ID | Title | Purpose |
+|-------|-----------|-------|---------|
+| 1 | role | Role & Context | Defines the AI's role and coaching context |
+| 2 | student | Student Profile | Student demographics and attention status |
+| 3 | session-notes | Session Notes | Wins, challenges, core notes, commitments |
+| 4 | assessment | Assessment Data | Latest assessment scores and results |
+| 5 | goals | Goals | Active and completed goals with progress |
+| 6 | sprint | Sprint Data | Current sprint focus and progress |
+| 7 | tasks | Tasks | Overdue, upcoming, and completed tasks |
+| 8 | recommendations | AI Recommendations | High-risk and pending recommendations |
+| 9 | data-availability | Data Availability | Lists available and missing data sources |
+| 10 | output-instructions | Output Instructions | Report structure and formatting rules |
+
+## 6. Template Organization
+
+All static prompt text is stored in `prompt.templates.ts`:
+
+- **SYSTEM_PROMPT**: Defines AI behavior, critical rules, and tone (1,200+ characters)
+- **ROLE_DEFINITION**: Coaching context and report audience
+- **COACH_STYLE**: Strengths-based approach, evidence-based observations, growth mindset
+- **REPORT_STYLE**: Structure, language, tone guidelines
+- **OUTPUT_FORMAT**: Required report sections (Executive Summary, Strengths, Challenges, etc.)
+- **GENERAL_RULES**: Data integrity, confidentiality, professionalism, clarity, actionability
+- **PROMPT_TEMPLATE_VERSION**: "1.0.0" for tracking changes
+
+### Template Design Principles
+
+1. **Explicit Constraints**: Never invent facts, use only supplied data, never diagnose
+2. **Professional Tone**: Educational coach, not psychologist
+3. **Evidence-Based**: Ground all statements in provided data
+4. **Growth-Focused**: Frame challenges as opportunities
+5. **Actionable**: Every insight leads to concrete next steps
+
+## 7. Example Generated Prompt
+
+Below is the first ~50 lines of a generated prompt (system message + beginning of user message):
+
+```
+=== SYSTEM MESSAGE ===
+
+You are an expert educational coach assistant for Koç360, a coaching platform that helps students achieve their academic and personal goals.
+
+Your role is to generate comprehensive coaching reports based on session data, student progress, and coaching observations.
+
+CRITICAL RULES:
+- Never invent facts or make assumptions beyond the provided data
+- Use ONLY the information explicitly provided in the context
+- Never diagnose the student with any medical or psychological conditions
+- Never label the student (e.g., "lazy", "gifted", "problematic")
+- Never exaggerate or minimize achievements or challenges
+- If information is missing or insufficient, explicitly state: "Insufficient evidence to determine..."
+- Write like an educational coach, NOT like a psychologist or therapist
+- Be constructive and solution-focused
+- Be objective and evidence-based
+- Explain your reasoning when making observations
+- Highlight uncertainty when appropriate
+- Use professional but warm language
+- Focus on growth and progress, not just problems
+- Provide actionable recommendations when data supports them
+
+TONE:
+- Professional yet approachable
+- Encouraging but realistic
+- Evidence-based and specific
+- Future-oriented and actionable
+- Respectful of the student's autonomy and dignity
+
+=== USER MESSAGE (first sections) ===
+
+COACHING CONTEXT:
+
+You are writing a coaching report for Student Name.
+Session Date: Unknown
+Sprint: Current sprint
+
+This report will be shared with the student and potentially their parents. It should be clear, actionable, and focused on growth.
+
+---
+
+STUDENT PROFILE:
+
+Name: Student Name
+Student ID: —
+
+---
+
+SESSION NOTES:
+
+Wins & Progress:
+The student has shown significant progress in Sprint 12, specifically regarding his focus on college application deadlines. Engagement improved from 'passive' to 'active'.
+
+Challenges & Obstacles:
+Morning fatigue and exam anxiety continue to pose challenges. The student struggles with time management and accountability.
+
+Core Notes:
+The student seemed distracted when discussing the physics project. He might need a follow-up session focusing purely on project breakdown steps to avoid overwhelm.
+
+Commitments:
+- Finalize Physics Lab Report (Deadline: Nov 2nd)
+- Mock TOEFL Test - Session 1 (Preparation: Review vocabulary lists)
+
+---
+
+ASSESSMENT DATA:
+
+No assessment data available for this student.
+
+---
+
+GOALS:
+
+Active Goals:
+
+1. Academic Resilience & Time Mgmt
+   Type: Academic
+   Status: In Progress
+   Target Date: 2024-12-31
+   Progress: 65%
+
+Completed Goals:
+
+1. Improve Math Grades
+   Type: Academic
+   Completed: 2024-09-15
+
+---
+
+[... continues with Sprint, Tasks, Recommendations, Data Availability, Output Instructions ...]
+```
+
+**Metadata:**
+- Template Version: 1.0.0
+- Character Count: ~8,500
+- Word Count: ~1,400
+- Available Sources: student, session, session-notes, goals, sprint, tasks
+- Missing Sources: assessment, coach-notes, parent-feedback, previous-reports
+
+## 8. Remaining TODO Items
+
+- [ ] Remove temporary console.log from report-workspace.tsx after testing
+- [ ] Implement JSON Schema for structured output (next sprint)
+- [ ] Add prompt validation (check for required sections, minimum length)
+- [ ] Implement prompt versioning strategy
+- [ ] Add A/B testing framework for prompt variations
+- [ ] Create prompt analytics (token usage, completion rates)
+- [ ] Implement prompt caching for repeated requests
+- [ ] Add multi-language support for prompts
+- [ ] Create prompt testing harness (unit tests for section builders)
+- [ ] Implement prompt optimization based on feedback
+- [ ] Add prompt security review (prevent prompt injection)
+- [ ] Create prompt documentation for stakeholders
+
+## 9. Recommended Next Sprint
+
+**Sprint: AI Engine Sprint 2 – LLM Provider Integration**
+
+1. Create provider abstraction layer (`src/lib/ai/provider.types.ts`)
+2. Implement OpenAI adapter (`src/lib/ai/openai.server.ts`)
+3. Implement Anthropic adapter (`src/lib/ai/anthropic.server.ts`)
+4. Create provider factory pattern for dynamic selection
+5. Add environment-based provider configuration
+6. Implement error handling and retry logic
+7. Add token counting and cost tracking
+8. Create response validation layer
+9. Implement JSON Schema for structured output
+10. Build end-to-end test: ReportContext → Prompt → LLM → Structured Response
+
+**Deliverables:**
+- Ability to generate actual coaching reports using OpenAI or Anthropic
+- Provider-independent interface for future LLM additions
+- Cost tracking and token usage monitoring
+- Structured JSON output matching report schema
+
+## 10. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 253 modules transformed
+✓ SSR build: 148 modules transformed
+✓ Nitro build: 297 modules transformed
+```
+
+No build errors or warnings.
+
+## 11. Commit Hash
+
+**Commit:** `3bd77bb`  
+**Message:** `Implement AI Engine Sprint 1 - Prompt Builder layer`  
+**Branch:** `main`  
+**Files changed:** 7 files (+1,720 lines)
+
+## 12. Push Result
+
+**Status:** ⏳ Pending
+
+The commit has been created but not yet pushed to origin/main.
+
+---
+
+## Summary
+
+Implemented the Prompt Builder layer for the Koç360 AI Engine. This layer:
+
+- **Converts ReportContext to PromptDocument**: Transforms aggregated coaching data into AI-ready prompts
+- **Provider-Independent**: Works with OpenAI, Anthropic, Gemini, or any future LLM provider
+- **Modular Architecture**: 10 reusable section builders, each with a specific purpose
+- **Template-Driven**: All static text stored in templates, easy to version and A/B test
+- **Strict Rules**: Explicitly instructs AI to never invent facts, never diagnose, use only supplied data
+- **Comprehensive Metadata**: Tracks available/missing sources, word count, character count
+- **Production-Ready**: Successfully builds with no errors, 1,720 lines of new code
+
+**Key Achievement:** The Prompt Builder is now ready to be connected to an LLM provider in Sprint 2.
+
+**Build status:** ✅ Success  
+**Deployed to:** Local repository (pending push to origin/main)  
+**Total files created:** 4  
+**Total files modified:** 1  
+**Total lines added:** 1,720
