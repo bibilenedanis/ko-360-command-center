@@ -21,12 +21,18 @@ import {
 } from "@/lib/report/report.mapper";
 import type { ReportWorkspaceData } from "@/lib/report/report.types";
 import { generateReportOutput, ValidationError } from "@/lib/report/generate.server";
-import type { ReportOutput } from "@/lib/ai/schema";
 import { mapReportOutputToWorkspaceData } from "@/lib/report/report-output.mapper";
+import { getLatestDraftForSession } from "@/lib/report/report.repository.server";
+import type { ReportRecord } from "@/lib/report/report-record.types";
 
 const loadReportWorkspace = createServerFn({ method: "GET" }).handler(
-  async (): Promise<ReportWorkspaceData> => {
-    return await getReportWorkspaceData();
+  async (): Promise<{
+    baseData: ReportWorkspaceData;
+    latestDraft: ReportRecord | null;
+  }> => {
+    const baseData = await getReportWorkspaceData();
+    const latestDraft = await getLatestDraftForSession(baseData.session.id);
+    return { baseData, latestDraft };
   },
 );
 
@@ -47,20 +53,32 @@ export const Route = createFileRoute("/report-workspace")({
 });
 
 function ReportWorkspacePage() {
-  const data = Route.useLoaderData() as ReportWorkspaceData;
+  const { baseData, latestDraft } = Route.useLoaderData() as {
+    baseData: ReportWorkspaceData;
+    latestDraft: ReportRecord | null;
+  };
+
   const [isGenerating, setIsGenerating] = useState(false);
-  const [reportOutput, setReportOutput] = useState<ReportOutput | null>(null);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const usedSources = getUsedSources(data);
-  const missingSources = getMissingSources(data);
-  const versionHistory = getVersionHistory(data);
+  const [currentDraft, setCurrentDraft] = useState<ReportRecord | null>(latestDraft);
+
+  const usedSources = getUsedSources(baseData);
+  const missingSources = getMissingSources(baseData);
+
+  const displayData = currentDraft
+    ? mapReportOutputToWorkspaceData(
+        currentDraft.reportOutput,
+        baseData,
+        currentDraft.createdAt,
+      )
+    : baseData;
 
   const handleGenerateAgain = async () => {
     setIsGenerating(true);
     try {
-      const output = await generateReportOutput({ data: { sessionId: data.session.id } });
-      setReportOutput(output);
-      setGeneratedAt(new Date().toISOString());
+      const draft = await generateReportOutput({
+        data: { sessionId: baseData.session.id },
+      });
+      setCurrentDraft(draft);
       toast.success("Report generated successfully.");
     } catch (error) {
       console.error("Failed to generate report:", error);
@@ -75,10 +93,6 @@ function ReportWorkspacePage() {
       setIsGenerating(false);
     }
   };
-
-  const displayData = reportOutput
-    ? mapReportOutputToWorkspaceData(reportOutput, data, generatedAt || undefined)
-    : data;
 
   return (
     <ReportShell reportStatus={displayData.report.metadata.reportStatus}>

@@ -5,6 +5,9 @@ import { getLLMProvider } from "@/lib/ai/provider.factory";
 import { validateReportOutput, ValidationError } from "@/lib/ai/validator.server";
 import type { ReportOutput } from "@/lib/ai/schema";
 import { aiLogger } from "@/lib/ai/logger";
+import { createDraft } from "./report.repository.server";
+import type { ReportRecord } from "./report-record.types";
+import { PROMPT_TEMPLATE_VERSION } from "./prompt.templates";
 
 export const generateReportOutput = createServerFn({ method: "POST" })
   .validator((data: unknown) => {
@@ -13,19 +16,23 @@ export const generateReportOutput = createServerFn({ method: "POST" })
     }
     return data as { sessionId: string };
   })
-  .handler(async ({ data }): Promise<ReportOutput> => {
+  .handler(async ({ data }): Promise<ReportRecord> => {
     const { sessionId } = data;
     const totalStart = Date.now();
 
     try {
       const context = await buildReportContext(sessionId);
+      const studentId = context.student.id;
 
       const prompt = buildReportPrompt(context);
       aiLogger.logPromptBuilt(prompt.metadata.characterCount, prompt.metadata.wordCount);
 
       const provider = getLLMProvider();
-      aiLogger.logGenerationStart(provider.providerName(), "configured", sessionId);
-      aiLogger.logProviderCall(provider.providerName(), "configured");
+      const providerName = provider.providerName();
+      const model = process.env.NVIDIA_MODEL || "openai/gpt-oss-120b";
+
+      aiLogger.logGenerationStart(providerName, model, sessionId);
+      aiLogger.logProviderCall(providerName, model);
 
       const providerStart = Date.now();
       const output = await provider.generate(prompt);
@@ -52,7 +59,22 @@ export const generateReportOutput = createServerFn({ method: "POST" })
       const totalDuration = Date.now() - totalStart;
       aiLogger.logGenerationComplete(totalDuration);
 
-      return reportOutput;
+      const sourceCoverage = prompt.metadata.availableSources.length /
+        (prompt.metadata.availableSources.length + prompt.metadata.missingSources.length);
+
+      const draft = await createDraft({
+        studentId,
+        sessionId,
+        reportOutput,
+        promptVersion: PROMPT_TEMPLATE_VERSION,
+        provider: providerName,
+        model,
+        confidence: reportOutput.confidence.score,
+        sourceCoverage,
+        generationDuration: totalDuration,
+      });
+
+      return draft;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       aiLogger.logError("generation.pipeline", errorMessage);
