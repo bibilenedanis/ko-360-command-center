@@ -18,9 +18,41 @@ import {
   getVersionHistory,
 } from "@/lib/report/report.mapper";
 import type { ReportWorkspaceData } from "@/lib/report/report.types";
+import { buildReportContext } from "@/lib/report/context.server";
+import { buildReportPrompt } from "@/lib/report/prompt.builder";
 
 const loadReportWorkspace = createServerFn({ method: "GET" }).handler(
   async (): Promise<ReportWorkspaceData> => {
+    // Temporary test: Build and log a prompt from a real session
+    // This will be removed after testing
+    try {
+      // Try to build a context from a test session ID
+      // Note: This will fail if the session doesn't exist in your Notion database
+      // You may need to replace this with a real session ID from your database
+      const testSessionId = "test-session-id"; // Replace with actual session ID
+      
+      console.log("[Prompt Builder Test] Building ReportContext...");
+      const context = await buildReportContext(testSessionId);
+      
+      console.log("[Prompt Builder Test] Building prompt...");
+      const prompt = buildReportPrompt(context);
+      
+      console.log("[Prompt Builder Test] Generated prompt:");
+      console.log("System prompt length:", prompt.system.length, "characters");
+      console.log("User prompt length:", prompt.user.length, "characters");
+      console.log("Total word count:", prompt.metadata.wordCount);
+      console.log("Available sources:", prompt.metadata.availableSources);
+      console.log("Missing sources:", prompt.metadata.missingSources);
+      console.log("\n--- SYSTEM PROMPT ---\n");
+      console.log(prompt.system);
+      console.log("\n--- USER PROMPT (first 2000 chars) ---\n");
+      console.log(prompt.user.substring(0, 2000));
+      console.log("\n--- END PROMPT PREVIEW ---\n");
+    } catch (error) {
+      console.log("[Prompt Builder Test] Could not build prompt from real data:", error instanceof Error ? error.message : error);
+      console.log("[Prompt Builder Test] This is expected if using placeholder data or invalid session ID");
+    }
+    
     return await getReportWorkspaceData();
   },
 );

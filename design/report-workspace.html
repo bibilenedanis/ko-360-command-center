@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Koç360 | Report Builder</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Geist&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        /* Custom scrollbar for minimalist look */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+        
+        .card-focus-effect:focus-within {
+            border-color: #000000 !important;
+            border-width: 1.5px !important;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary": "#000000",
+                        "on-surface-variant": "#4c4546",
+                        "on-primary-container": "#848484",
+                        "on-secondary-fixed-variant": "#46464e",
+                        "surface-variant": "#e2e2e3",
+                        "on-primary": "#ffffff",
+                        "surface-container-high": "#e8e8e9",
+                        "secondary-container": "#e3e1ec",
+                        "on-tertiary": "#ffffff",
+                        "outline-variant": "#cfc4c5",
+                        "outline": "#7e7576",
+                        "primary-fixed-dim": "#c6c6c6",
+                        "on-background": "#1a1c1d",
+                        "secondary-fixed-dim": "#c6c5cf",
+                        "tertiary-fixed-dim": "#c6c6c6",
+                        "tertiary-fixed": "#e2e2e2",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-fixed": "#1b1b1b",
+                        "on-secondary-container": "#63646c",
+                        "primary": "#000000",
+                        "surface-container": "#eeeeef",
+                        "on-error": "#ffffff",
+                        "on-tertiary-container": "#848484",
+                        "surface-container-highest": "#e2e2e3",
+                        "tertiary-container": "#1b1b1b",
+                        "on-secondary-fixed": "#1a1b22",
+                        "surface-tint": "#5e5e5e",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#ba1a1a",
+                        "on-surface": "#1a1c1d",
+                        "on-primary-fixed": "#1b1b1b",
+                        "surface-dim": "#dadadb",
+                        "surface-container-low": "#f3f3f4",
+                        "inverse-on-surface": "#f0f1f2",
+                        "secondary-fixed": "#e3e1ec",
+                        "primary-container": "#1b1b1b",
+                        "background": "#f9f9fa",
+                        "surface-bright": "#f9f9fa",
+                        "primary-fixed": "#e2e2e2",
+                        "surface": "#f9f9fa",
+                        "inverse-surface": "#2f3132",
+                        "error-container": "#ffdad6",
+                        "on-secondary": "#ffffff",
+                        "inverse-primary": "#c6c6c6",
+                        "secondary": "#5d5e66",
+                        "on-tertiary-fixed-variant": "#474747",
+                        "on-primary-fixed-variant": "#474747"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-width": "240px",
+                        "padding-card": "24px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "container-max": "1120px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-base": ["Inter"],
+                        "mono-label": ["Geist"],
+                        "label-bold": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "body-base": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "mono-label": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-bold": ["12px", {"lineHeight": "16px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-base antialiased">
+<!-- TopNavBar (Shared Component) -->
+<header class="bg-surface border-b border-outline-variant fixed top-0 left-0 w-full z-40 h-16 flex justify-between items-center px-gutter">
+<div class="flex items-center gap-8">
+<span class="text-headline-lg font-headline-lg font-bold text-primary">Koç360</span>
+<nav class="hidden md:flex gap-6">
+<a class="text-on-surface-variant hover:text-primary font-label-bold text-label-bold" href="#">Reports</a>
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-label-bold text-label-bold" href="#">Analytics</a>
+<a class="text-on-surface-variant hover:text-primary font-label-bold text-label-bold" href="#">Teams</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-label-bold font-label-bold text-on-surface-variant hover:bg-surface-container-high px-3 py-2 transition-colors">Help</button>
+<button class="bg-primary text-on-primary px-4 py-2 font-label-bold text-label-bold rounded-DEFAULT hover:opacity-90 transition-opacity">Create New</button>
+<div class="flex gap-2">
+<span class="material-symbols-outlined p-2 hover:bg-surface-container transition-colors cursor-pointer" data-icon="notifications">notifications</span>
+<span class="material-symbols-outlined p-2 hover:bg-surface-container transition-colors cursor-pointer" data-icon="settings">settings</span>
+</div>
+<img alt="Profile" class="w-8 h-8 rounded-full border border-outline-variant" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDk_nUZaTFaK_lDuB7yU_tS5DceB9rIIGhFpVGa3frfpVJSv-cjN7NtFUd8gq2Mi47n-psuU6W9o4IIGS2HhAQM6swLTXmLZ_1b5vD7mnKUO5o2nprSFF5ALkJgdFv-PewfoYmMexkFljfO58wGgxWyhXnyb4K8tJeZFeL5O40bf3meoYMwpE_p8aIkhetZnVM8wkwVI5U7KhFigM5UQU2fA5TM5IXLIF2QCiZMYUjrs_3opHZgUmOnRuHQ6RmWJhRfKej6QK7tOqc"/>
+</div>
+</header>
+<!-- SideNavBar (Shared Component) -->
+<aside class="fixed left-0 top-16 bottom-0 w-sidebar-width bg-surface-container-low border-r border-outline-variant hidden md:flex flex-col">
+<div class="p-6">
+<h2 class="text-label-bold font-label-bold uppercase tracking-widest text-primary mb-1">Report Workspace</h2>
+<p class="text-body-sm font-body-sm text-on-surface-variant">Draft v2.4</p>
+</div>
+<nav class="flex-1 flex flex-col">
+<div class="px-2 space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 border-l-2 border-primary bg-surface-container-high text-primary font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="source">source</span>
+                    AI Sources
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-secondary-container hover:bg-surface-container font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="analytics">analytics</span>
+                    Confidence
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-secondary-container hover:bg-surface-container font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="bolt">bolt</span>
+                    Actions
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-secondary-container hover:bg-surface-container font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="history">history</span>
+                    History
+                </a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-secondary-container hover:bg-surface-container font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                    Settings
+                </a>
+</div>
+</nav>
+<div class="p-4 border-t border-outline-variant">
+<button class="w-full bg-primary text-on-primary py-3 rounded-DEFAULT font-label-bold text-label-bold mb-4">Generate Section</button>
+<div class="space-y-2">
+<a class="flex items-center gap-3 px-4 py-2 text-on-secondary-container hover:bg-surface-container font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="archive">archive</span>
+                    Archive
+                </a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-secondary-container hover:bg-surface-container font-label-bold text-label-bold" href="#">
+<span class="material-symbols-outlined" data-icon="help">help</span>
+                    Support
+                </a>
+</div>
+</div>
+</aside>
+<!-- Main Content Layout -->
+<main class="ml-0 md:ml-sidebar-width pt-16 pb-24 min-h-screen">
+<!-- Header Section -->
+<section class="bg-surface border-b border-outline-variant p-6 sticky top-16 z-30">
+<div class="max-w-[1400px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
+<div>
+<div class="flex items-center gap-3 mb-2">
+<h1 class="text-headline-lg font-headline-lg text-primary">Ali Yılmaz</h1>
+<span class="px-2 py-0.5 border border-primary text-mono-label font-mono-label uppercase">Reviewing</span>
+</div><p class="text-body-sm text-on-surface-variant mb-4">Completion: 92% | Estimated reading time: 2 min</p>
+<div class="flex flex-wrap gap-x-6 gap-y-2 text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-1"><span class="font-bold">Session Date:</span> 24 Oct 2023</div>
+<div class="flex items-center gap-1"><span class="font-bold">Sprint:</span> Sprint 12</div>
+<div class="flex items-center gap-1"><span class="font-bold">Goal:</span> Academic Resilience &amp; Time Mgmt</div>
+</div>
+</div>
+<div class="bg-surface-container-low border border-outline-variant p-4 rounded-DEFAULT flex flex-col gap-2 min-w-[240px]"><div class="flex justify-between items-center"><span class="text-mono-label font-mono-label uppercase text-on-surface-variant">Status</span><div class="flex gap-1"><span class="px-1.5 py-0.5 bg-surface-variant text-on-surface-variant text-mono-label rounded-DEFAULT">Draft</span><span class="px-1.5 py-0.5 bg-primary text-on-primary text-mono-label rounded-DEFAULT">Reviewing</span></div></div><div class="flex justify-between items-center gap-4"><div class="text-body-sm"><p class="text-on-surface-variant">Last Generated:</p><p class="font-bold">24 Oct, 14:35</p></div><button class="border border-outline px-3 py-1.5 text-body-sm font-label-bold hover:bg-surface-container transition-colors flex items-center gap-1"><span class="material-symbols-outlined text-sm">refresh</span>Generate Again</button></div></div>
+</div>
+</section>
+<!-- Content Grid -->
+<div class="max-w-[1400px] mx-auto p-gutter grid grid-cols-12 gap-gutter">
+<!-- Document Canvas (70%) -->
+<div class="col-span-12 lg:col-span-8 space-y-gutter space-y-8">
+<!-- Card Component -->
+<article class="bg-surface border border-outline-variant card-focus-effect p-padding-card"><div class="flex justify-between items-center mb-4 border-b border-outline-variant pb-2"><h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant">AI Summary</h3><span class="material-symbols-outlined text-on-surface-variant cursor-pointer">edit</span></div><div class="space-y-6"><div class="space-y-1"><p class="text-mono-label font-mono-label uppercase text-on-surface-variant">Current Status</p><p class="text-body-base text-on-surface">Ali has shown significant progress in Sprint 12, specifically regarding his focus on college application deadlines. Engagement improved from 'passive' to 'active'.</p></div><div class="space-y-1"><p class="text-mono-label font-mono-label uppercase text-on-surface-variant">Key Insight</p><p class="text-body-base text-on-surface">AI analysis suggests a 15% increase in task completion rate, indicating a strong shift towards self-regulation.</p></div><div class="space-y-1"><p class="text-mono-label font-mono-label uppercase text-on-surface-variant">Recommended Focus</p><p class="text-body-base text-on-surface">Maintain momentum through the upcoming physics project while introducing structured morning routines.</p></div></div></article>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+<article class="bg-surface border border-outline-variant card-focus-effect p-padding-card"><div class="flex justify-between items-center mb-4 border-b border-outline-variant pb-2"><h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant">Strengths</h3><span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="add">add</span></div><div class="flex flex-wrap gap-2"><span class="px-3 py-1 bg-surface-container-high border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">check</span>Strong ownership</span><span class="px-3 py-1 bg-surface-container-high border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">check</span>Improved consistency</span><span class="px-3 py-1 bg-surface-container-high border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">check</span>Self-directed learning</span><span class="px-3 py-1 bg-surface-container-high border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">check</span>Exam resilience</span></div></article>
+<article class="bg-surface border border-outline-variant card-focus-effect p-padding-card"><div class="flex justify-between items-center mb-4 border-b border-outline-variant pb-2"><h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant">Challenges</h3><span class="material-symbols-outlined text-on-surface-variant cursor-pointer" data-icon="warning">warning</span></div><div class="flex flex-wrap gap-2"><span class="px-3 py-1 border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">warning</span>Morning fatigue</span><span class="px-3 py-1 border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">warning</span>Exam anxiety</span><span class="px-3 py-1 border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">warning</span>Low accountability</span><span class="px-3 py-1 border border-outline-variant text-body-sm rounded-full flex items-center gap-1"><span class="material-symbols-outlined text-sm">warning</span>Time management</span></div></article>
+</div>
+<article class="bg-surface border border-outline-variant card-focus-effect p-padding-card"><div class="flex justify-between items-center mb-2 border-b border-outline-variant pb-2"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-on-surface-variant text-sm">lock</span><h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant">Private Coach Notes</h3></div><span class="text-mono-label font-mono-label text-on-surface-variant">Visible only to coaches</span></div><textarea class="w-full border-none focus:ring-0 p-0 text-body-base text-on-surface placeholder:text-outline h-32 resize-none" placeholder="Add specific observation details here...">Ali seemed distracted when discussing his physics project. He might need a follow-up session focusing purely on project breakdown steps to avoid overwhelm.</textarea></article>
+<article class="bg-surface border border-outline-variant card-focus-effect p-padding-card">
+<div class="flex justify-between items-center mb-4 border-b border-outline-variant pb-2">
+<h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant">Next Sprint Focus</h3>
+</div>
+<div class="space-y-4">
+<div class="flex gap-4 items-start">
+<div class="w-4 h-4 mt-1 border border-primary rounded-full flex-shrink-0"></div>
+<div>
+<h4 class="font-bold text-body-base">Finalize Physics Lab Report</h4>
+<p class="text-body-sm text-on-surface-variant">Deadline: Nov 2nd</p>
+</div>
+</div>
+<div class="flex gap-4 items-start">
+<div class="w-4 h-4 mt-1 border border-primary rounded-full flex-shrink-0"></div>
+<div>
+<h4 class="font-bold text-body-base">Mock TOEFL Test - Session 1</h4>
+<p class="text-body-sm text-on-surface-variant">Preparation: Review vocabulary lists</p>
+</div>
+</div>
+</div>
+</article>
+<!-- Version History Timeline -->
+<section class="mt-12">
+<h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant mb-4">Version History</h3>
+<div class="relative pl-8 border-l border-outline-variant space-y-8"><div class="relative"><div class="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-primary border-4 border-background"></div><div><p class="text-label-bold font-label-bold">Viewed</p><p class="text-mono-label font-mono-label text-on-surface-variant">OCT 26, 09:15 • By Parent</p></div></div><div class="relative"><div class="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-outline-variant border-4 border-background"></div><div><p class="text-label-bold font-label-bold text-on-surface-variant">Shared with Parent</p><p class="text-mono-label font-mono-label text-on-surface-variant">OCT 25, 18:00 • System Action</p></div></div><div class="relative"><div class="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-outline-variant border-4 border-background"></div><div><p class="text-label-bold font-label-bold text-on-surface-variant">Published</p><p class="text-mono-label font-mono-label text-on-surface-variant">OCT 25, 17:45 • By Coach Sarah</p></div></div><div class="relative"><div class="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-outline-variant border-4 border-background"></div><div><p class="text-label-bold font-label-bold text-on-surface-variant">Approved</p><p class="text-mono-label font-mono-label text-on-surface-variant">OCT 25, 16:20 • By Head Coach</p></div></div><div class="relative"><div class="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-outline-variant border-4 border-background"></div><div><p class="text-label-bold font-label-bold text-on-surface-variant">Coach Edited</p><p class="text-mono-label font-mono-label text-on-surface-variant">OCT 25, 14:30 • By Coach Sarah</p></div></div><div class="relative"><div class="absolute -left-[37px] top-1 w-4 h-4 rounded-full bg-outline-variant border-4 border-background"></div><div><p class="text-label-bold font-label-bold text-on-surface-variant">AI Draft Created</p><p class="text-mono-label font-mono-label text-on-surface-variant">OCT 24, 09:00 • System Generated</p></div></div></div>
+</section>
+</div>
+<!-- Side Workspace (30%) -->
+<aside class="col-span-12 lg:col-span-4 space-y-gutter space-y-8">
+<!-- Section 1: AI Sources -->
+<div class="bg-surface-container-low border border-outline-variant p-6"><h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant mb-4 flex items-center gap-2"><span class="material-symbols-outlined text-sm">database</span>AI Sources</h3><div class="space-y-4"><div class="space-y-2"><p class="text-mono-label font-mono-label uppercase text-on-surface-variant">Used Sources</p><div class="space-y-1"><div class="flex items-center gap-2 text-body-sm"><span class="material-symbols-outlined text-sm text-primary">check_box</span>Session Notes</div><div class="flex items-center gap-2 text-body-sm"><span class="material-symbols-outlined text-sm text-primary">check_box</span>Sprint Log</div><div class="flex items-center gap-2 text-body-sm"><span class="material-symbols-outlined text-sm text-primary">check_box</span>Tasks</div><div class="flex items-center gap-2 text-body-sm"><span class="material-symbols-outlined text-sm text-primary">check_box</span>Assessment</div><div class="flex items-center gap-2 text-body-sm"><span class="material-symbols-outlined text-sm text-primary">check_box</span>Commitments</div></div></div><div class="space-y-2"><p class="text-mono-label font-mono-label uppercase text-on-surface-variant">Missing Data</p><div class="space-y-1"><div class="flex items-center gap-2 text-body-sm text-on-surface-variant"><span class="material-symbols-outlined text-sm">check_box_outline_blank</span>Parent Feedback</div><div class="flex items-center gap-2 text-body-sm text-on-surface-variant"><span class="material-symbols-outlined text-sm">check_box_outline_blank</span>Latest Assessment</div></div></div></div></div>
+<!-- Section 2: AI Confidence -->
+<div class="bg-surface-container-low border border-outline-variant p-6">
+<div class="flex justify-between items-center mb-4">
+<h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant">AI Confidence</h3>
+<span class="text-label-bold text-primary">88%</span>
+</div>
+<div class="w-full bg-surface-variant h-1 mb-6">
+<div class="bg-primary h-1" style="width: 88%"></div>
+</div>
+<p class="text-mono-label font-mono-label uppercase text-on-surface-variant mb-3">Missing Information</p>
+<ul class="space-y-2 mb-6">
+<li class="text-body-sm flex gap-2 items-start text-error">
+<span class="material-symbols-outlined text-sm mt-0.5" data-icon="error">error</span>
+                            Parent goals for this sprint are not updated.
+                        </li>
+</ul>
+<p class="text-mono-label font-mono-label uppercase text-on-surface-variant mb-3">Suggestions</p>
+<button class="w-full text-left p-3 border border-dashed border-outline-variant hover:border-primary text-body-sm transition-colors group">
+<span class="group-hover:underline">Ask Ali about "Math Anxiety" for deeper analysis.</span>
+</button>
+<div class="mt-6 pt-6 border-t border-outline-variant"><div class="flex justify-between items-center mb-2"><p class="text-mono-label font-mono-label uppercase text-on-surface-variant">Publishing Readiness</p><span class="text-label-bold text-primary">92%</span></div><div class="w-full bg-surface-variant h-2 rounded-full overflow-hidden mb-2"><div class="bg-primary h-full" style="width: 92%"></div></div><p class="text-body-sm font-bold text-primary">Ready to Publish</p></div></div>
+<!-- Section 3: Quick Actions -->
+<div class="bg-surface border border-outline-variant p-6"><h3 class="text-label-bold font-label-bold uppercase text-on-surface-variant mb-4">Quick Actions</h3><div class="space-y-2"><button class="w-full flex items-center gap-3 p-3 border border-outline-variant hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">picture_as_pdf</span><div class="text-left"><p class="text-body-sm font-label-bold">Export PDF</p><p class="text-mono-label text-on-surface-variant">Create printable version</p></div></button><button class="w-full flex items-center gap-3 p-3 border border-outline-variant hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">family_restroom</span><div class="text-left"><p class="text-body-sm font-label-bold">Parent Version</p><p class="text-mono-label text-on-surface-variant">Hide coach-only notes</p></div></button><button class="w-full flex items-center gap-3 p-3 border border-outline-variant hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">person</span><div class="text-left"><p class="text-body-sm font-label-bold">Student Version</p><p class="text-mono-label text-on-surface-variant">Student-friendly wording</p></div></button><button class="w-full flex items-center gap-3 p-3 border border-outline-variant hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined">share</span><div class="text-left"><p class="text-body-sm font-label-bold">Share Report</p><p class="text-mono-label text-on-surface-variant">Generate secure share link</p></div></button><button class="w-full flex flex-col items-center justify-center p-2 text-on-surface-variant hover:text-primary transition-colors"><div class="flex items-center gap-2 text-mono-label uppercase"><span class="material-symbols-outlined text-sm">refresh</span>Regenerate AI</div><p class="text-mono-label lowercase opacity-70">Create a new AI draft using updated data</p></button></div></div>
+</aside>
+</div>
+</main>
+<!-- Fixed Bottom Action Bar (Shared Component) -->
+<footer class="fixed bottom-0 left-0 w-full z-50 flex justify-end gap-4 px-gutter py-4 bg-surface/80 backdrop-blur-sm border-t border-outline-variant"><button class="text-on-surface-variant p-2 hover:text-primary transition-colors font-label-bold text-label-bold flex items-center gap-2 active:scale-95 transition-transform"><span class="material-symbols-outlined">save</span>Save Draft</button><button class="border border-outline text-on-surface p-2 px-6 hover:bg-surface-container transition-colors font-label-bold text-label-bold flex items-center gap-2 active:scale-95 transition-transform rounded-xl"><span class="material-symbols-outlined">check_circle</span>Approve Report</button><button class="bg-primary text-on-primary rounded-xl p-2 px-8 font-label-bold text-label-bold flex items-center gap-2 active:scale-95 transition-transform"><span class="material-symbols-outlined">publish</span>Publish Report</button></footer>
+<script>
+        // Simple micro-interaction for cards
+        document.querySelectorAll('article').forEach(card => {
+            card.addEventListener('click', () => {
+                // Focus simulation
+                console.log('Editing section...');
+            });
+        });
+
+        // Theme Toggle Logic (optional visual polish)
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class') {
+                    console.log('Theme changed');
+                }
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true });
+    </script>
+</body></html>
