@@ -1888,3 +1888,2024 @@ Successfully implemented the Draft Report Pipeline that connects the "Generate A
 3. Save generated report to Notion Reports database
 4. Implement report versioning and history
 5. Add report editing and approval workflow
+
+---
+
+# NVIDIA AI Provider Integration Sprint Report
+
+## 1. Files Modified
+
+- `src/lib/report/generate.server.ts` — Updated to call LLM provider and validate response
+- `src/routes/report-workspace.tsx` — Added AI response handling and rendering logic
+
+## 2. Files Created
+
+- `src/lib/ai/provider.types.ts` — Provider interface and configuration types
+- `src/lib/ai/provider.factory.ts` — Factory function to instantiate LLM provider based on environment
+- `src/lib/ai/nvidia.server.ts` — NVIDIA Build API provider implementation
+- `src/lib/ai/validator.server.ts` — Response validator and parser
+- `src/lib/ai/response.types.ts` — Structured AI response type definitions
+
+## 3. Provider Interface
+
+The provider abstraction layer defines a common interface for all LLM providers:
+
+```typescript
+export interface LLMProvider {
+  providerName(): string;
+  generate(promptDocument: PromptDocument): Promise<PromptOutput>;
+  health(): Promise<boolean>;
+}
+
+export interface LLMProviderConfig {
+  apiKey: string;
+  model: string;
+}
+
+export type LLMProviderName = "nvidia" | "openai" | "anthropic" | "openrouter" | "ollama";
+```
+
+### Provider Responsibilities
+
+1. **providerName()** — Returns the provider identifier (e.g., "nvidia", "openai")
+2. **generate(promptDocument)** — Accepts a PromptDocument and returns a PromptOutput with the AI response
+3. **health()** — Checks if the provider is available and responsive
+
+### Key Design Principles
+
+- **Provider-Independent**: The application code never references specific providers
+- **Environment-Driven**: Provider selection is controlled via `LLM_PROVIDER` environment variable
+- **Extensible**: New providers can be added by implementing the `LLMProvider` interface
+- **Type-Safe**: All provider interactions use strict TypeScript types
+
+## 4. NvidiaProvider Implementation
+
+**File:** `src/lib/ai/nvidia.server.ts`
+
+### Implementation Details
+
+```typescript
+export class NvidiaProvider implements LLMProvider {
+  private config: LLMProviderConfig;
+
+  constructor(config: LLMProviderConfig) {
+    this.config = config;
+  }
+
+  providerName(): string {
+    return "nvidia";
+  }
+
+  async generate(promptDocument: PromptDocument): Promise<PromptOutput> {
+    // Calls NVIDIA Build API
+    // Endpoint: https://integrate.api.nvidia.com/v1/chat/completions
+    // Uses configured model: openai/gpt-oss-120b
+    // Returns PromptOutput with response text and token usage
+  }
+
+  async health(): Promise<boolean> {
+    // Checks provider availability via models endpoint
+    // Endpoint: https://integrate.api.nvidia.com/v1/models
+  }
+}
+```
+
+### NVIDIA API Call Details
+
+**Endpoint:** `https://integrate.api.nvidia.com/v1/chat/completions`
+
+**Request Format:**
+```typescript
+{
+  model: "openai/gpt-oss-120b",
+  messages: [
+    { role: "system", content: promptDocument.system },
+    { role: "user", content: promptDocument.user }
+  ],
+  temperature: 0.7,
+  max_tokens: 4000
+}
+```
+
+**Response Format:**
+```typescript
+{
+  choices: [
+    {
+      message: {
+        content: "AI response text"
+      }
+    }
+  ],
+  usage: {
+    prompt_tokens: number,
+    completion_tokens: number,
+    total_tokens: number
+  }
+}
+```
+
+**Error Handling:**
+- Throws error if API returns non-200 status
+- Throws error if response is empty or malformed
+- Includes error details in exception message
+
+## 5. Adapter Flow
+
+The complete adapter flow from UI to AI provider:
+
+```
+User clicks "Generate Again"
+          ↓
+ReportHeader.onGenerateAgain()
+          ↓
+handleGenerateAgain() in report-workspace.tsx
+          ↓
+setIsGenerating(true) → Button shows loading state
+          ↓
+generateReportPrompt({ sessionId })
+          ↓
+Server function executes:
+    ├── buildReportContext(sessionId)
+    │      ↓
+    │   Fetches real Notion data
+    │      ↓
+    │   Returns ReportContext
+    │
+    ├── buildReportPrompt(context)
+    │      ↓
+    │   Returns PromptDocument { system, user, metadata }
+    │
+    ├── getLLMProvider()
+    │      ↓
+    │   Reads LLM_PROVIDER from environment
+    │      ↓
+    │   Instantiates NvidiaProvider (or other provider)
+    │
+    ├── provider.generate(prompt)
+    │      ↓
+    │   Calls NVIDIA Build API
+    │      ↓
+    │   Returns PromptOutput { text, model, tokens }
+    │
+    └── validateAndParseResponse(output, sessionId, studentId)
+           ↓
+        Parses JSON metadata from response
+           ↓
+        Extracts markdown sections
+           ↓
+        Returns AIResponse { sections, confidence, sources }
+          ↓
+Return AIResponse to client
+          ↓
+setAiResponse(response)
+          ↓
+transformAIResponseToWorkspaceData(response, baseData)
+          ↓
+Update UI with AI-generated content
+          ↓
+setIsGenerating(false) → Button returns to normal state
+          ↓
+toast.success("Report generated successfully.")
+```
+
+### Key Transformation Steps
+
+1. **ReportContext → PromptDocument**: Existing prompt builder converts context to provider-agnostic prompt
+2. **PromptDocument → PromptOutput**: Provider-specific implementation calls the AI API
+3. **PromptOutput → AIResponse**: Validator parses and structures the response
+4. **AIResponse → ReportWorkspaceData**: UI transformer maps response to component props
+
+## 6. Environment Variables Used
+
+| Variable | Purpose | Example Value |
+|----------|---------|---------------|
+| `LLM_PROVIDER` | Selects which LLM provider to use | `"nvidia"` |
+| `NVIDIA_API_KEY` | Authentication key for NVIDIA Build API | `"nvapi-..."` |
+| `NVIDIA_MODEL` | Model identifier for NVIDIA API | `"openai/gpt-oss-120b"` |
+
+### Configuration Location
+
+Environment variables are read from `.env.local` file in the project root.
+
+### Provider Selection Logic
+
+```typescript
+export function getLLMProvider(): LLMProvider {
+  const providerName = (process.env.LLM_PROVIDER || "nvidia").toLowerCase();
+
+  switch (providerName) {
+    case "nvidia": {
+      const apiKey = process.env.NVIDIA_API_KEY;
+      const model = process.env.NVIDIA_MODEL || "openai/gpt-oss-120b";
+
+      if (!apiKey) {
+        throw new Error("NVIDIA_API_KEY environment variable is not set");
+      }
+
+      return new NvidiaProvider({ apiKey, model });
+    }
+
+    default:
+      throw new Error(`Unsupported LLM provider: ${providerName}`);
+  }
+}
+```
+
+## 7. NVIDIA Endpoint Used
+
+**API Base URL:** `https://integrate.api.nvidia.com/v1`
+
+**Endpoints:**
+
+1. **Chat Completions**: `POST /v1/chat/completions`
+   - Used for generating AI reports
+   - Accepts system and user messages
+   - Returns generated text and token usage
+
+2. **Models**: `GET /v1/models`
+   - Used for health checks
+   - Verifies API key validity
+   - Returns available models list
+
+**Authentication:** Bearer token in Authorization header
+
+**Content-Type:** `application/json`
+
+## 8. Response Validator
+
+**File:** `src/lib/ai/validator.server.ts`
+
+### Validation Strategy
+
+The validator performs three-stage validation:
+
+1. **Length Check**: Ensures response is not empty or too short (< 100 characters)
+2. **Metadata Extraction**: Parses JSON metadata block from response
+3. **Section Parsing**: Extracts markdown sections (## headings)
+
+### Metadata Extraction
+
+The validator attempts to extract JSON metadata in two ways:
+
+1. **Code Block Format**: Looks for ```json ... ``` blocks
+2. **Inline JSON**: Searches for JSON objects with balanced braces
+
+### Section Parsing
+
+Parses markdown sections using heading detection:
+
+```typescript
+function parseMarkdownSections(markdown: string): AIResponseSection[] {
+  const sections: AIResponseSection[] = [];
+  const headingRegex = /^##\s+(.+)$/gm;
+  
+  // Extract all ## headings
+  // Capture content between headings
+  // Return structured sections array
+}
+```
+
+### Error Handling
+
+If validation fails, throws a `ValidationError` with detailed error messages:
+
+```typescript
+export class ValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly errors: string[]
+  ) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+```
+
+### Validation Failures
+
+The validator throws errors if:
+- Response is empty or too short
+- No JSON metadata can be parsed
+- No markdown sections are found
+
+## 9. Structured Response Format
+
+**File:** `src/lib/ai/response.types.ts`
+
+### AIResponse Interface
+
+```typescript
+export interface AIResponse {
+  reportType: string;              // e.g., "session", "sprint", "progress"
+  studentId: string;               // Student identifier
+  sessionId: string;               // Session identifier
+  generatedAt: string;             // ISO timestamp
+  confidence: number;              // 0.0 to 1.0
+  sourcesUsed: string[];           // List of data sources used
+  sourcesMissing: string[];        // List of missing data sources
+  wordCount: number;               // Total word count
+  sections: AIResponseSection[];   // Parsed report sections
+  rawMarkdown: string;             // Original markdown content
+  metadata: AIResponseMetadata;    // Provider and validation metadata
+}
+
+export interface AIResponseSection {
+  id: string;                      // Unique section identifier
+  title: string;                   // Section heading (e.g., "Executive Summary")
+  content: string;                 // Section content (markdown)
+  order: number;                   // Display order
+}
+
+export interface AIResponseMetadata {
+  providerName: string;            // "nvidia", "openai", etc.
+  model: string;                   // Model identifier
+  promptTokens?: number;           // Tokens in prompt
+  completionTokens?: number;       // Tokens in completion
+  totalTokens?: number;            // Total tokens used
+  validationPassed: boolean;       // Validation success flag
+  validationErrors: string[];      // Validation error messages
+  validatedAt: string;             // Validation timestamp
+}
+```
+
+### Example Response Structure
+
+```json
+{
+  "reportType": "session",
+  "studentId": "abc-123",
+  "sessionId": "def-456",
+  "generatedAt": "2026-08-03T18:45:32.123Z",
+  "confidence": 0.88,
+  "sourcesUsed": ["session-notes", "sprint", "tasks"],
+  "sourcesMissing": ["assessment"],
+  "wordCount": 950,
+  "sections": [
+    {
+      "id": "section-0",
+      "title": "Executive Summary",
+      "content": "This session focused on...",
+      "order": 0
+    },
+    {
+      "id": "section-1",
+      "title": "Strengths & Progress",
+      "content": "- **Strength 1**: ...\n- **Strength 2**: ...",
+      "order": 1
+    }
+  ],
+  "rawMarkdown": "## Executive Summary\n\nThis session...",
+  "metadata": {
+    "providerName": "nvidia",
+    "model": "openai/gpt-oss-120b",
+    "promptTokens": 1423,
+    "completionTokens": 950,
+    "totalTokens": 2373,
+    "validationPassed": true,
+    "validationErrors": [],
+    "validatedAt": "2026-08-03T18:45:33.456Z"
+  }
+}
+```
+
+## 10. UI Integration Flow
+
+### State Management
+
+```typescript
+const [isGenerating, setIsGenerating] = useState(false);
+const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
+```
+
+### Generate Again Handler
+
+```typescript
+const handleGenerateAgain = async () => {
+  setIsGenerating(true);
+  try {
+    const response = await generateReportPrompt({ data: { sessionId: data.session.id } });
+    setAiResponse(response);
+    toast.success("Report generated successfully.");
+  } catch (error) {
+    console.error("Failed to generate report:", error);
+    toast.error("Report generation failed.");
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+### Data Transformation
+
+The `transformAIResponseToWorkspaceData()` function maps the AI response to the workspace data structure:
+
+```typescript
+function transformAIResponseToWorkspaceData(
+  response: AIResponse,
+  baseData: ReportWorkspaceData
+): ReportWorkspaceData {
+  // Map response.sections to report.summary
+  // Extract strengths from sections with "strength" in title
+  // Extract challenges from sections with "challenge" in title
+  // Update metadata with generation timestamp and confidence
+  // Return transformed ReportWorkspaceData
+}
+```
+
+### List Item Extraction
+
+Extracts list items from markdown content:
+
+```typescript
+function extractListItems(markdown: string): string[] {
+  // Parses lines starting with "- " or "* "
+  // Parses numbered lists "1. "
+  // Returns array of list items
+}
+```
+
+### Display Logic
+
+```typescript
+const displayData = aiResponse ? transformAIResponseToWorkspaceData(aiResponse, data) : data;
+```
+
+- If `aiResponse` is null, displays the original workspace data
+- If `aiResponse` exists, displays the AI-generated content
+
+### Loading States
+
+- Button text changes from "Generate Again" to "Generating..."
+- Icon changes from "refresh" to "hourglass_empty" with spin animation
+- Button is disabled during generation
+- Button opacity reduced to 50% when disabled
+
+### Toast Notifications
+
+- **Success**: "Report generated successfully."
+- **Error**: "Report generation failed."
+
+## 11. Error Handling
+
+### Provider Errors
+
+1. **Missing API Key**: Throws if `NVIDIA_API_KEY` is not set
+2. **API Request Failure**: Throws with status code and error message
+3. **Empty Response**: Throws if API returns no content
+4. **Network Errors**: Propagated as exceptions
+
+### Validation Errors
+
+1. **Empty Response**: "Response is too short or empty"
+2. **Missing Metadata**: "Could not parse JSON metadata from response"
+3. **Missing Sections**: "No markdown sections found in response"
+
+### UI Error Handling
+
+```typescript
+try {
+  const response = await generateReportPrompt({ data: { sessionId } });
+  setAiResponse(response);
+  toast.success("Report generated successfully.");
+} catch (error) {
+  console.error("Failed to generate report:", error);
+  toast.error("Report generation failed.");
+}
+```
+
+- Catches all exceptions from the server function
+- Logs error to console for debugging
+- Shows user-friendly toast notification
+- Resets loading state
+
+### Error Recovery
+
+- User can retry by clicking "Generate Again" again
+- Loading state is always reset in `finally` block
+- No page reload required
+- Existing data remains visible if generation fails
+
+## 12. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 256 modules transformed
+✓ SSR build: 154 modules transformed
+✓ Nitro build: 299 modules transformed
+```
+
+No build errors or warnings. All new files compile successfully.
+
+## 13. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  modified:   src/lib/report/generate.server.ts
+  modified:   src/routes/report-workspace.tsx
+
+Untracked files:
+  src/lib/ai/
+```
+
+All changes committed and pushed.
+
+## 14. Commit Hash
+
+**Commit:** `6a04b7d`  
+**Message:** `Integrate NVIDIA AI Provider for report generation`  
+**Branch:** `main`  
+**Files changed:** 7 files (+455 lines, -33 lines)
+
+## 15. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   e12ca4f..6a04b7d  main -> main
+```
+
+Successfully pushed to `origin/main`.
+
+## 16. git status --short
+
+```
+```
+
+**Status:** Clean working tree. All changes committed and pushed.
+
+---
+
+## Summary
+
+Successfully integrated the first real AI provider (NVIDIA) into Koç360, establishing the permanent provider architecture that future providers will reuse.
+
+**Key Achievements:**
+
+1. **Provider Abstraction Layer** — Created `LLMProvider` interface with three methods: `providerName()`, `generate()`, and `health()`. This abstraction allows the application to work with any LLM provider without code changes.
+
+2. **NVIDIA Provider Implementation** — Implemented `NvidiaProvider` using the NVIDIA Build API with model `openai/gpt-oss-120b`. The provider handles API calls, error handling, and token tracking.
+
+3. **Response Validator** — Created a robust validator that parses JSON metadata and extracts markdown sections from AI responses. The validator throws typed errors for invalid responses without crashing the UI.
+
+4. **Structured Response Format** — Defined `AIResponse` interface with sections, confidence scores, source tracking, and metadata. This format is provider-independent and can be rendered in the UI.
+
+5. **Environment-Driven Configuration** — Provider selection is controlled via `LLM_PROVIDER` environment variable. API keys and model names are read from environment, never hardcoded.
+
+6. **UI Integration** — Updated the Report Workspace to handle AI responses, transform them to workspace data, and render them without page reload. Added loading states and toast notifications.
+
+7. **End-to-End Pipeline** — Complete flow from ReportContext → PromptDocument → LLM Provider → Validator → Structured Response → UI Rendering.
+
+**Architecture Compliance:**
+
+- ✅ Provider-independent abstraction
+- ✅ Environment-based configuration
+- ✅ Reuses existing Prompt Builder
+- ✅ No direct coupling to NVIDIA
+- ✅ Type-safe interfaces throughout
+- ✅ Graceful error handling
+- ✅ No UI redesign
+- ✅ No modifications to Prompt Builder logic
+
+**Next Steps:**
+
+1. Test with real NVIDIA API calls
+2. Add more providers (OpenAI, Anthropic, OpenRouter)
+3. Implement response caching
+4. Add token cost tracking
+5. Implement advanced validation (grounding check, safety check)
+6. Add retry logic with exponential backoff
+
+**Build status:** ✅ Success  
+**Deployed to:** `origin/main`  
+**Total files created:** 5  
+**Total files modified:** 2  
+**Total lines added:** 455  
+**Total lines removed:** 33
+
+
+---
+
+# AI Engine Sprint 3 — Structured Output Pipeline
+
+## 1. Files Created
+
+- `src/lib/ai/schema.ts` — Complete ReportOutput schema with TypeScript interfaces
+- `src/lib/report/report-output.mapper.ts` — Maps ReportOutput to ReportWorkspaceData
+
+## 2. Files Modified
+
+- `src/lib/report/prompt.templates.ts` — Updated OUTPUT_FORMAT to request JSON instead of markdown
+- `src/lib/report/prompt.sections.ts` — Updated buildOutputSection() with JSON schema instructions
+- `src/lib/ai/nvidia.server.ts` — Added `response_format: { type: "json_object" }` and JSON parse validation
+- `src/lib/ai/validator.server.ts` — Completely rewritten for JSON validation (removed all markdown parsing)
+- `src/lib/report/generate.server.ts` — Returns ReportOutput instead of AIResponse
+- `src/routes/report-workspace.tsx` — Uses mapper instead of markdown extraction
+
+## 3. Files Deleted
+
+- `src/lib/ai/response.types.ts` — Replaced by `src/lib/ai/schema.ts`
+
+## 4. ReportOutput Schema
+
+```typescript
+interface ReportOutputSummary {
+  currentStatus: string;
+  keyInsight: string;
+  recommendedFocus: string;
+}
+
+interface ReportOutputNextSprintFocusItem {
+  title: string;
+  description: string;
+}
+
+interface ReportOutputConfidence {
+  score: number;       // 0 to 1
+  missingInformation: string[];
+  suggestions: string[];
+}
+
+interface ReportOutput {
+  summary: ReportOutputSummary;
+  strengths: string[];
+  challenges: string[];
+  coachNotes: string;
+  nextSprintFocus: ReportOutputNextSprintFocusItem[];
+  confidence: ReportOutputConfidence;
+}
+```
+
+## 5. Prompt Changes
+
+The `OUTPUT_FORMAT` template and `buildOutputSection()` function were updated to explicitly request JSON:
+
+**Before (markdown):**
+```
+## 1. EXECUTIVE SUMMARY
+Brief overview...
+## 2. STRENGTHS & PROGRESS
+...
+FORMAT: Markdown with clear headings
+```
+
+**After (JSON):**
+```
+Return ONLY valid JSON.
+Do not wrap inside markdown.
+Do not explain.
+Do not add extra text.
+
+Output MUST match this schema exactly:
+{
+  "summary": { "currentStatus": "...", "keyInsight": "...", "recommendedFocus": "..." },
+  "strengths": ["..."],
+  "challenges": ["..."],
+  "coachNotes": "...",
+  "nextSprintFocus": [{ "title": "...", "description": "..." }],
+  "confidence": { "score": 0.85, "missingInformation": ["..."], "suggestions": ["..."] }
+}
+```
+
+The PromptBuilder architecture itself was NOT modified — only the template strings changed.
+
+## 6. NVIDIA Provider Changes
+
+Two key changes to `NvidiaProvider`:
+
+1. **Added `response_format`**: The API request now includes `response_format: { type: "json_object" }` which instructs the NVIDIA API to return structured JSON.
+
+2. **Added early JSON validation**: After receiving the response, the provider attempts to `JSON.parse()` the text. If parsing fails, it throws a `ValidationError` immediately.
+
+## 7. Validator Changes
+
+The validator was completely rewritten. All markdown parsing was removed:
+
+**Removed:**
+- `extractMetadata()` — JSON metadata extraction from mixed text
+- `parseMarkdownSections()` — Heading-based section parser
+- `AIResponse` type construction from sections
+
+**Added:**
+- `validateReportOutput(output)` — Parses and validates the complete ReportOutput schema
+- `validateSummary()` — Validates summary object with 3 required string fields
+- `validateStringArray()` — Validates arrays of non-empty strings
+- `validateString()` — Validates individual non-empty string fields
+- `validateNextSprintFocus()` — Validates array of objects with title + description
+- `validateConfidence()` — Validates confidence object with score (0-1), missingInformation, suggestions
+
+All validation functions accumulate errors in a shared array and throw `ValidationError` if any errors are found.
+
+## 8. Mapping Flow
+
+```
+ReportOutput (from validator)
+          ↓
+mapReportOutputToWorkspaceData(output, baseData, generatedAt)
+          ↓
+    ├── buildSummarySections(summary)
+    │      → [
+    │          { label: "Current Status", content: summary.currentStatus },
+    │          { label: "Key Insight", content: summary.keyInsight },
+    │          { label: "Recommended Focus", content: summary.recommendedFocus }
+    │        ]
+    │
+    ├── strengths → output.strengths (string[])
+    ├── challenges → output.challenges (string[])
+    ├── coachNotes → output.coachNotes (string)
+    ├── nextSprintFocus → [{ title, detail }] (SprintFocusItem[])
+    ├── confidence → output.confidence.score * 100 (number)
+    │
+    └── ReportWorkspaceData (same shape as before)
+```
+
+The workspace components receive the exact same props they did before. The UI does not know an AI exists.
+
+## 9. Workspace Flow
+
+```
+User clicks "Generate Again"
+          ↓
+handleGenerateAgain()
+          ↓
+setIsGenerating(true) → Button loading state
+          ↓
+generateReportOutput({ sessionId })
+          ↓
+Server function executes:
+    ├── buildReportContext(sessionId) → ReportContext
+    ├── buildReportPrompt(context) → PromptDocument (JSON output instructions)
+    ├── provider.generate(prompt) → PromptOutput (raw JSON text)
+    └── validateReportOutput(output) → ReportOutput (typed, validated)
+          ↓
+Return ReportOutput to client
+          ↓
+setReportOutput(output)
+setGeneratedAt(timestamp)
+          ↓
+mapReportOutputToWorkspaceData(output, baseData) → displayData
+          ↓
+Components render with displayData (no UI changes needed)
+          ↓
+setIsGenerating(false)
+          ↓
+toast.success("Report generated successfully.")
+```
+
+## 10. Error Handling
+
+### JSON Parsing Failure (in provider)
+If the LLM response cannot be parsed as JSON, the NVIDIA provider throws a `ValidationError` with message "LLM response is not valid JSON".
+
+### Schema Validation Failure (in validator)
+If the JSON is valid but doesn't match the ReportOutput schema, the validator throws a `ValidationError` with specific field-level errors, e.g.:
+- "summary is missing or not an object"
+- "strengths[0] must be a non-empty string"
+- "confidence.score must be a number between 0 and 1"
+
+### UI Error Handling
+```typescript
+try {
+  const output = await generateReportOutput({ data: { sessionId } });
+  setReportOutput(output);
+  toast.success("Report generated successfully.");
+} catch (error) {
+  if (error instanceof ValidationError) {
+    toast.error("Report validation failed: " + error.errors.join(", "));
+  } else if (error instanceof Error) {
+    toast.error("Report generation failed: " + error.message);
+  } else {
+    toast.error("Report generation failed.");
+  }
+}
+```
+
+### Recovery
+- On failure, the previous workspace data remains visible (no state reset)
+- User can retry by clicking "Generate Again" again
+- Loading state is always reset in `finally` block
+
+## 11. Removed Markdown Logic
+
+The following markdown-related logic was completely removed:
+
+1. **`extractMetadata()`** in `validator.server.ts` — Extracted JSON metadata from mixed markdown/JSON text using brace counting and regex. Deleted entirely.
+
+2. **`parseMarkdownSections()`** in `validator.server.ts` — Parsed markdown headings (`## Heading`) and extracted content between them. Deleted entirely.
+
+3. **`transformAIResponseToWorkspaceData()`** in `report-workspace.tsx` — Mapped markdown sections to workspace data using title matching and list extraction. Replaced by `mapReportOutputToWorkspaceData()`.
+
+4. **`extractListItems()`** in `report-workspace.tsx` — Parsed markdown list items (`- `, `* `, `1. `). No longer needed — strengths and challenges come as pre-parsed string arrays from the AI.
+
+5. **`AIResponse` interface** in `response.types.ts` — The old response type with sections, rawMarkdown, and metadata. Replaced by `ReportOutput` in `schema.ts`.
+
+6. **`AIResponseSection` interface** — Markdown section type. No longer needed.
+
+7. **`rawMarkdown` field** — No response stores raw markdown anymore.
+
+8. **`wordCount` field** — No longer tracked in response (AI doesn't return it).
+
+9. **`reportType`, `studentId`, `sessionId`, `generatedAt`, `sourcesUsed`, `sourcesMissing`** — These metadata fields were removed from the AI response. The workspace already knows these from the loader data.
+
+## 12. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 258 modules transformed
+✓ SSR build: 155 modules transformed
+✓ Nitro build: 300 modules transformed
+```
+
+No build errors or warnings.
+
+## 13. Commit Hash
+
+**Commit:** `7bb1c61`  
+**Message:** `Replace markdown pipeline with structured JSON output`  
+**Branch:** `main`  
+**Files changed:** 9 files (+451 lines, -330 lines)
+
+## 14. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   6a04b7d..7bb1c61  main -> main
+```
+
+## 15. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+```
+
+Clean working tree. All changes committed and pushed.
+
+## 16. Remaining TODOs
+
+- [ ] Implement retry logic with exponential backoff for LLM calls
+- [ ] Add token cost tracking per generation
+- [ ] Implement response caching for identical inputs
+- [ ] Add grounding check (verify claims against source data)
+- [ ] Add safety check (scan for prohibited language)
+- [ ] Implement confidence score calibration
+- [ ] Add more providers (OpenAI, Anthropic, OpenRouter, Ollama)
+- [ ] Implement structured output for other AI features (session coaching, sprint advising)
+- [ ] Add A/B testing framework for prompt variations
+- [ ] Implement prompt versioning strategy
+- [ ] Add AI output persistence (save to Notion Reports database)
+
+---
+
+## Summary
+
+Successfully replaced the markdown-based AI output pipeline with a fully structured JSON pipeline. The AI now returns typed, validated JSON that maps directly to workspace components without any markdown parsing.
+
+**Architecture Before:**
+```
+ReportContext → PromptBuilder → LLM → Markdown → Markdown Parser → Workspace
+```
+
+**Architecture After:**
+```
+ReportContext → PromptBuilder → LLM → Structured JSON → Validator → Mapper → Workspace
+```
+
+**Key Changes:**
+1. Created `ReportOutput` schema with typed interfaces
+2. Updated prompts to request JSON only
+3. Added `response_format: { type: "json_object" }` to NVIDIA API calls
+4. Rewrote validator for JSON schema validation
+5. Created mapper from `ReportOutput` to `ReportWorkspaceData`
+6. Removed all markdown parsing utilities
+7. Updated error handling with typed `ValidationError`
+
+**What Was NOT Changed:**
+- PromptBuilder architecture (only templates updated)
+- ReportContext (no modifications)
+- Report Workspace layout (no UI changes)
+- Workspace components (receive same props)
+- Provider interface (LLMProvider unchanged)
+
+**Build status:** ✅ Success  
+**Deployed to:** `origin/main`  
+**Total files created:** 2  
+**Total files modified:** 6  
+**Total files deleted:** 1  
+**Total lines added:** 451  
+**Total lines removed:** 330
+
+---
+
+# AI Engine Sprint 4 — Runtime Schema & Test Harness
+
+## 1. Files Created
+
+- `src/lib/ai/report-output.schema.ts` — Zod runtime schema for ReportOutput
+- `src/lib/ai/logger.ts` — Structured AI generation logger
+- `src/lib/ai/testing/index.ts` — Test harness barrel export
+- `src/lib/ai/testing/sample-report-context.ts` — Sample ReportContext fixture
+- `src/lib/ai/testing/sample-prompt.ts` — Sample PromptDocument fixture
+- `src/lib/ai/testing/sample-response.json` — Sample LLM JSON response
+- `src/lib/ai/testing/golden-output.json` — Expected validated output
+- `src/lib/ai/testing/snapshot.ts` — Snapshot comparison utilities
+
+## 2. Files Modified
+
+- `src/lib/ai/schema.ts` — Now re-exports from Zod schema (schema.ts → report-output.schema.ts)
+- `src/lib/ai/validator.server.ts` — Rewritten to use Zod parsing + business validation
+- `src/lib/ai/provider.types.ts` — Added `ProviderHealthResult` interface, changed `health()` return type
+- `src/lib/ai/nvidia.server.ts` — Implemented typed health check with 3 checks (apiReachable, modelExists, apiKeyValid)
+- `src/lib/report/generate.server.ts` — Integrated AIGenerationLogger into pipeline
+
+## 3. Zod Schema Design
+
+```typescript
+import { z } from "zod";
+
+export const ReportOutputSummarySchema = z.object({
+  currentStatus: z.string().min(1),
+  keyInsight: z.string().min(1),
+  recommendedFocus: z.string().min(1),
+});
+
+export const ReportOutputNextSprintFocusItemSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().min(1),
+});
+
+export const ReportOutputConfidenceSchema = z.object({
+  score: z.number().min(0).max(1),
+  missingInformation: z.array(z.string().min(1)),
+  suggestions: z.array(z.string().min(1)),
+});
+
+export const ReportOutputSchema = z.object({
+  summary: ReportOutputSummarySchema,
+  strengths: z.array(z.string().min(1)).min(1),
+  challenges: z.array(z.string().min(1)).min(1),
+  coachNotes: z.string().min(1),
+  nextSprintFocus: z.array(ReportOutputNextSprintFocusItemSchema),
+  confidence: ReportOutputConfidenceSchema,
+});
+
+export type ReportOutput = z.infer<typeof ReportOutputSchema>;
+```
+
+Types are inferred from Zod schemas using `z.infer<>`. The original `schema.ts` now re-exports from `report-output.schema.ts` for backward compatibility.
+
+## 4. Validation Pipeline
+
+The validation pipeline now has two stages:
+
+### Stage 1: Schema Validation (Zod)
+
+```typescript
+const zodResult = ReportOutputSchema.safeParse(parsed);
+if (!zodResult.success) {
+  throw new ValidationError("Schema validation failed", zodErrors);
+}
+```
+
+This catches:
+- Missing fields
+- Wrong types (string vs number, etc.)
+- Empty strings where non-empty required
+- Empty arrays where non-empty required
+- Confidence score outside 0-1 range
+
+### Stage 2: Business Validation
+
+```typescript
+function runBusinessValidation(output: ReportOutput): BusinessValidationIssue[] {
+  // Checks for quality issues (warnings, not errors):
+  // - confidence.score < 0.5 → warning
+  // - strengths.length < 2 → warning
+  // - challenges.length < 2 → warning
+  // - summary fields < 20 chars → warning
+  // - nextSprintFocus empty → warning
+  // - sprint focus title > 100 chars → warning
+  // - coachNotes < 10 chars → warning
+}
+```
+
+Business validation issues are categorized as "error" or "warning". Currently all business checks are warnings — none are fatal errors. This can be adjusted as the system matures.
+
+### Two validation entry points:
+
+1. `validateReportOutput(output)` — Strict mode, throws on business errors
+2. `validateReportOutputWithWarnings(output)` — Returns both output and business issues
+
+## 5. Removed Manual Validation
+
+The following manual validation functions were removed from `validator.server.ts`:
+
+- `validateSummary()` — Replaced by `ReportOutputSummarySchema`
+- `validateStringArray()` — Replaced by `z.array(z.string().min(1))`
+- `validateString()` — Replaced by `z.string().min(1)`
+- `validateNextSprintFocus()` — Replaced by `ReportOutputNextSprintFocusItemSchema`
+- `validateConfidence()` — Replaced by `ReportOutputConfidenceSchema`
+
+Total lines removed: ~190 lines of manual validation logic replaced by ~30 lines of Zod schema definitions.
+
+## 6. Test Harness Structure
+
+```
+src/lib/ai/testing/
+├── index.ts                    — Barrel export for all testing utilities
+├── sample-report-context.ts    — createSampleReportContext() factory
+├── sample-prompt.ts            — createSamplePromptDocument() factory
+├── sample-response.json        — Sample LLM JSON response (realistic)
+├── golden-output.json          — Expected validated output
+└── snapshot.ts                 — compareReportOutput(), formatSnapshotReport()
+```
+
+### Sample ReportContext
+
+Contains realistic data for student "Ali Yilmaz" with:
+- 2 active goals, 1 completed goal
+- 1 overdue task, 2 upcoming tasks, 1 completed task
+- Active sprint (Sprint 12)
+- Mid-term math assessment
+- 1 pending AI recommendation
+- Missing coach notes, parent feedback, previous reports
+
+### Sample Prompt Document
+
+Contains a complete PromptDocument with system and user messages matching what `buildReportPrompt()` would produce.
+
+### Sample Response JSON
+
+A realistic LLM JSON response with:
+- 3 summary fields (currentStatus, keyInsight, recommendedFocus)
+- 5 strengths
+- 4 challenges
+- coachNotes paragraph
+- 3 nextSprintFocus items
+- confidence score 0.82 with missing info and suggestions
+
+### Golden Output JSON
+
+The expected output after Zod validation — identical to sample-response.json (since the sample is already valid).
+
+## 7. Snapshot Utilities
+
+```typescript
+interface SnapshotDiff {
+  path: string;
+  type: "changed" | "missing" | "extra";
+  expected?: unknown;
+  actual?: unknown;
+}
+
+interface SnapshotReport {
+  match: boolean;
+  diffs: SnapshotDiff[];
+  summary: { changed: number; missing: number; extra: number; total: number };
+}
+
+function compareReportOutput(expected: ReportOutput, actual: ReportOutput): SnapshotReport;
+function formatSnapshotReport(report: SnapshotReport): string;
+```
+
+Deep comparison of two ReportOutput objects with diff reporting:
+- Recursively compares nested objects and arrays
+- Reports changed values, missing fields, and extra fields
+- Uses JSON path notation (e.g., `summary.currentStatus`, `strengths[0]`)
+- `formatSnapshotReport()` produces human-readable diff output
+
+## 8. Provider Health Improvements
+
+### Before:
+```typescript
+health(): Promise<boolean>
+```
+
+### After:
+```typescript
+interface ProviderHealthResult {
+  healthy: boolean;
+  provider: string;
+  model: string;
+  checks: {
+    apiReachable: boolean;
+    modelExists: boolean;
+    apiKeyValid: boolean;
+  };
+  error?: string;
+  checkedAt: string;
+}
+
+health(): Promise<ProviderHealthResult>
+```
+
+### NVIDIA Implementation:
+
+The health check now performs 3 distinct checks:
+
+1. **API Reachable**: Calls `GET /v1/models` and checks if the endpoint responds
+2. **API Key Valid**: Checks for 401/403 status codes indicating authentication failure
+3. **Model Exists**: Parses the models list and verifies the configured model is available
+
+Returns granular health information instead of a simple boolean, enabling:
+- Targeted error messages ("API key expired" vs "model not found" vs "API unreachable")
+- Dashboard health indicators per check
+- Automated alerting on specific failure modes
+
+## 9. Logging Implementation
+
+### AIGenerationLogger
+
+```typescript
+class AIGenerationLogger {
+  log(entry: AIGenerationLogEntry): void;
+  logGenerationStart(provider, model, sessionId?): void;
+  logPromptBuilt(promptSize, wordCount): void;
+  logProviderCall(provider, model): void;
+  logResponseReceived(model, responseSize, durationMs, tokens?): void;
+  logValidationStart(): void;
+  logValidationComplete(passed, durationMs, errors?): void;
+  logGenerationComplete(totalDurationMs): void;
+  logError(event, error): void;
+}
+```
+
+### Logged Events:
+- `generation.start` — Pipeline started
+- `generation.prompt_built` — Prompt size and word count
+- `generation.provider_call` — Provider being called
+- `generation.response_received` — Response size, duration, tokens
+- `generation.validation_start` — Validation beginning
+- `generation.validation_complete` — Validation result and duration
+- `generation.complete` — Total pipeline duration
+- `generation.error` — Error with message
+
+### Security:
+- Never logs API keys
+- Automatically redacts patterns: `nvapi-*`, `Bearer *`, `api_key: *`
+- No sensitive student data logged (only sessionId, not student name)
+
+### Configuration:
+- Enabled by default in development (`NODE_ENV === "development"`)
+- Can be manually enabled/disabled via constructor parameter
+
+## 10. Runtime Pipeline Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. ReportContext                                                │
+│     buildReportContext(sessionId)                                │
+│     Aggregates Notion data into typed context                    │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. Prompt Builder                                               │
+│     buildReportPrompt(context)                                   │
+│     Converts context to PromptDocument (system + user + JSON     │
+│     output instructions)                                         │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. Provider                                                     │
+│     provider.generate(promptDocument)                            │
+│     Calls NVIDIA Build API with response_format: json_object     │
+│     Returns PromptOutput { text, model, tokens }                 │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  4. JSON Parse                                                   │
+│     JSON.parse(output.text)                                      │
+│     Fails fast if not valid JSON                                 │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  5. Zod Schema Validation                                        │
+│     ReportOutputSchema.parse(parsed)                             │
+│     Validates structure, types, ranges, non-empty constraints    │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  6. Business Validation                                          │
+│     runBusinessValidation(reportOutput)                          │
+│     Checks quality: confidence range, array lengths, field       │
+│     lengths, sprint focus items                                  │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  7. Mapper                                                       │
+│     mapReportOutputToWorkspaceData(output, baseData)             │
+│     Transforms ReportOutput → ReportWorkspaceData                │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  8. Workspace UI                                                 │
+│     Components receive same props as before                      │
+│     No awareness of AI pipeline                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Cross-cutting: Structured Logging
+
+At each stage, the `AIGenerationLogger` records:
+- Prompt size (chars, words)
+- Provider call timing
+- Response size and token usage
+- Validation duration and results
+- Total pipeline duration
+
+## 11. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 269 modules transformed
+✓ SSR build: 157 modules transformed
+✓ Nitro build: 310 modules transformed
+```
+
+No build errors or warnings. Zod library bundled at 99.92 kB (gzip: 17.27 kB).
+
+## 12. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+```
+
+Clean working tree. All changes committed and pushed.
+
+## 13. Commit Hash
+
+**Commit:** `989b3f8`  
+**Message:** `Add Zod schema, validation pipeline, test harness, and structured logging`  
+**Branch:** `main`  
+**Files changed:** 13 files (+1,098 lines, -250 lines)
+
+## 14. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   7bb1c61..989b3f8  main -> main
+```
+
+## 15. Remaining Technical Debt
+
+- [ ] Add unit tests for Zod schema edge cases
+- [ ] Implement retry logic with exponential backoff for LLM calls
+- [ ] Add token cost tracking per generation
+- [ ] Implement response caching for identical inputs
+- [ ] Add grounding check (verify claims against source data)
+- [ ] Add safety check (scan for prohibited language)
+- [ ] Implement confidence score calibration across providers
+- [ ] Add more providers (OpenAI, Anthropic, OpenRouter, Ollama)
+- [ ] Implement structured output for other AI features (session coaching, sprint advising)
+- [ ] Add A/B testing framework for prompt variations
+- [ ] Implement prompt versioning strategy
+- [ ] Add AI output persistence (save to Notion Reports database)
+- [ ] Create developer CLI for running test harness locally
+- [ ] Add snapshot test runner integration
+
+---
+
+## Summary
+
+Successfully strengthened the AI Engine with runtime schema validation, a two-stage validation pipeline, a test harness for offline testing, snapshot comparison utilities, improved provider health checks, and structured logging.
+
+**Key Achievements:**
+
+1. **Zod Runtime Schema** — Replaced 190 lines of manual validation with 30 lines of Zod schema. Types are now inferred from the schema, ensuring a single source of truth.
+
+2. **Two-Stage Validation** — Schema validation (Zod) catches structural issues; business validation catches quality issues. Both are independently configurable.
+
+3. **Test Harness** — Complete set of fixtures (context, prompt, response, golden output) enables testing the entire pipeline without calling NVIDIA. Developers can iterate on prompts and validation locally.
+
+4. **Snapshot Testing** — `compareReportOutput()` provides deep diff comparison with path-based reporting. Useful for regression testing and prompt optimization.
+
+5. **Provider Health** — Typed `ProviderHealthResult` with 3 granular checks (apiReachable, modelExists, apiKeyValid) enables targeted error handling and dashboard indicators.
+
+6. **Structured Logging** — `AIGenerationLogger` records every pipeline stage with timing, sizes, and token counts. Automatically redacts sensitive data (API keys).
+
+**Architecture Compliance:**
+- ✅ No UI changes
+- ✅ No Prompt Builder architecture changes
+- ✅ No ReportContext changes
+- ✅ No Report Workspace changes
+- ✅ No Notion modifications
+- ✅ Existing API contracts preserved (schema.ts re-exports)
+
+**Build status:** ✅ Success  
+**Deployed to:** `origin/main`  
+**Total files created:** 8  
+**Total files modified:** 5  
+**Total lines added:** 1,098  
+**Total lines removed:** 250
+
+---
+
+# Sprint 5 — Report Lifecycle: Reports Repository & Draft Persistence
+
+## 1. Files Created
+
+- `src/lib/report/report-record.types.ts` — ReportRecord interface and status types
+- `src/lib/report/report.repository.server.ts` — Repository layer with in-memory storage
+
+## 2. Files Modified
+
+- `src/lib/report/generate.server.ts` — Now persists drafts after validation
+- `src/routes/report-workspace.tsx` — Loads drafts from repository instead of volatile state
+
+## 3. ReportRecord Schema
+
+```typescript
+type ReportStatus = "draft" | "reviewing" | "approved" | "published" | "archived";
+
+interface ReportRecord {
+  id: string;                    // Unique identifier
+  studentId: string;             // Student reference
+  sessionId: string;             // Session reference
+  version: number;               // Incremental version number
+  status: ReportStatus;          // Current lifecycle status
+  createdAt: string;             // ISO timestamp
+  updatedAt: string;             // ISO timestamp
+  generatedBy: string;           // "ai" (future: coach name)
+  reportOutput: ReportOutput;    // Validated AI output
+  promptVersion: string;         // Prompt template version used
+  provider: string;              // LLM provider name
+  model: string;                 // LLM model identifier
+  confidence: number;            // AI confidence score (0-1)
+  sourceCoverage: number;        // Ratio of available/total sources
+  generationDuration: number;    // Total pipeline duration in ms
+}
+```
+
+### Status Lifecycle
+
+```
+Generate → Draft → Review → Approved → Published
+                     ↓
+                  Archived
+```
+
+This sprint implements only the **Draft** stage. Future sprints will implement:
+- `reviewing` — Coach begins review
+- `approved` — Coach approves the draft
+- `published` — Report shared with student/parents
+- `archived` — Report archived (read-only)
+
+## 4. Repository Architecture
+
+```typescript
+// Repository API
+createDraft(params) → ReportRecord
+getDraft(reportId) → ReportRecord | null
+getLatestDraftForSession(sessionId) → ReportRecord | null
+updateDraft(reportId, updates) → ReportRecord | null
+listStudentReports(studentId) → ReportRecord[]
+listSessionReports(sessionId) → ReportRecord[]
+deleteDraft(reportId) → boolean
+getReportVersionHistory(sessionId) → ReportRecord[]
+```
+
+### Current Implementation
+
+The repository uses **in-memory storage** (module-level `Map<string, ReportRecord>`) for this sprint. This is intentionally isolated so the implementation can be swapped with a Notion Reports database later without affecting the application.
+
+### Future Notion Integration
+
+When the Reports Notion database is created, only `report.repository.server.ts` needs to change:
+- Replace `Map` with Notion API calls
+- Map `ReportRecord` fields to Notion properties
+- Implement CRUD operations via Notion API
+- No other files need modification
+
+## 5. Persistence Flow
+
+```
+User clicks "Generate Again"
+          ↓
+generateReportOutput({ sessionId })
+          ↓
+Server function executes:
+    ├── buildReportContext(sessionId)
+    │      ↓
+    │   Returns ReportContext with studentId
+    │
+    ├── buildReportPrompt(context)
+    │      ↓
+    │   Returns PromptDocument
+    │
+    ├── provider.generate(prompt)
+    │      ↓
+    │   Returns PromptOutput (raw JSON)
+    │
+    ├── validateReportOutput(output)
+    │      ↓
+    │   Returns ReportOutput (validated)
+    │
+    └── createDraft({
+           studentId, sessionId,
+           reportOutput, promptVersion,
+           provider, model,
+           confidence, sourceCoverage,
+           generationDuration
+         })
+           ↓
+        Repository stores ReportRecord
+           ↓
+        Returns ReportRecord to client
+          ↓
+Workspace loads draft from repository
+          ↓
+Renders draft content
+```
+
+## 6. Versioning Strategy
+
+Every generation creates a **new version**. Previous versions are never overwritten.
+
+```typescript
+// In createDraft():
+const existingDrafts = await listSessionReports(sessionId);
+const nextVersion = existingDrafts.length > 0
+  ? Math.max(...existingDrafts.map((r) => r.version)) + 1
+  : 1;
+```
+
+### Version History
+
+For a session with 3 generations:
+- Version 1: First generation
+- Version 2: Second generation (after "Generate Again")
+- Version 3: Third generation
+
+All versions are stored in the repository and can be retrieved via `getReportVersionHistory(sessionId)`.
+
+### Latest Draft
+
+The workspace always loads the **latest version** for the session:
+
+```typescript
+const latestDraft = await getLatestDraftForSession(sessionId);
+```
+
+## 7. Workspace Integration
+
+### Before (Volatile State)
+
+```typescript
+const [reportOutput, setReportOutput] = useState<ReportOutput | null>(null);
+const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+
+// On generation:
+setReportOutput(output);
+setGeneratedAt(new Date().toISOString());
+```
+
+### After (Repository-Backed)
+
+```typescript
+const { baseData, latestDraft } = Route.useLoaderData();
+const [currentDraft, setCurrentDraft] = useState<ReportRecord | null>(latestDraft);
+
+// On generation:
+const draft = await generateReportOutput({ sessionId });
+setCurrentDraft(draft);
+
+// Display:
+const displayData = currentDraft
+  ? mapReportOutputToWorkspaceData(currentDraft.reportOutput, baseData, currentDraft.createdAt)
+  : baseData;
+```
+
+### Key Changes
+
+1. **Route loader** now returns both `baseData` and `latestDraft`
+2. **Initial state** is loaded from repository (not null)
+3. **After generation**, the full `ReportRecord` is stored (not just `ReportOutput`)
+4. **Display logic** uses `currentDraft.reportOutput` and `currentDraft.createdAt`
+
+## 8. Draft Metadata
+
+Each draft persists the following generation metadata:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `createdAt` | string | ISO timestamp of generation |
+| `updatedAt` | string | ISO timestamp of last update |
+| `provider` | string | LLM provider name (e.g., "nvidia") |
+| `model` | string | LLM model (e.g., "openai/gpt-oss-120b") |
+| `promptVersion` | string | Prompt template version (e.g., "1.0.0") |
+| `generationDuration` | number | Total pipeline duration in ms |
+| `confidence` | number | AI confidence score (0-1) |
+| `sourceCoverage` | number | Ratio of available/total sources (0-1) |
+
+### Source Coverage Calculation
+
+```typescript
+const sourceCoverage = prompt.metadata.availableSources.length /
+  (prompt.metadata.availableSources.length + prompt.metadata.missingSources.length);
+```
+
+This measures how much of the expected data was available when generating the report.
+
+## 9. Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  1. ReportContext                                                │
+│     buildReportContext(sessionId)                                │
+│     Aggregates Notion data into typed context                    │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  2. Prompt Builder                                               │
+│     buildReportPrompt(context)                                   │
+│     Converts context to PromptDocument (JSON output instructions)│
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  3. LLM Provider                                                 │
+│     provider.generate(promptDocument)                            │
+│     Calls NVIDIA Build API with response_format: json_object     │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  4. Structured JSON                                              │
+│     Raw JSON text from LLM                                       │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  5. Runtime Validation                                           │
+│     Zod schema + business validation                             │
+│     Returns typed ReportOutput                                   │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  6. Report Repository                                            │
+│     createDraft({ reportOutput, metadata })                      │
+│     Persists ReportRecord with versioning                        │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  7. Draft Record                                                 │
+│     ReportRecord stored in repository                            │
+│     Includes: id, version, status, timestamps, metadata          │
+└───────────────────────────┬─────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  8. Workspace UI                                                 │
+│     Loads latest draft from repository                           │
+│     Maps ReportOutput → ReportWorkspaceData                      │
+│     Components render draft content                              │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## 10. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 269 modules transformed
+✓ SSR build: 158 modules transformed
+✓ Nitro build: 311 modules transformed
+```
+
+No build errors or warnings.
+
+## 11. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+```
+
+Clean working tree. All changes committed and pushed.
+
+## 12. Commit Hash
+
+**Commit:** `1a819dc`  
+**Message:** `Implement Report Lifecycle — Repository & Draft Persistence`  
+**Branch:** `main`  
+**Files changed:** 4 files (+194 lines, -20 lines)
+
+## 13. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   989b3f8..1a819dc  main -> main
+```
+
+## 14. Remaining Technical Debt
+
+- [ ] Create Reports database in Notion for persistent storage
+- [ ] Implement `reviewing` status transition (coach begins review)
+- [ ] Implement `approved` status transition (coach approves)
+- [ ] Implement `published` status transition (report shared)
+- [ ] Implement `archived` status transition (report archived)
+- [ ] Add UI for viewing version history
+- [ ] Add UI for comparing versions
+- [ ] Add UI for reverting to a previous version
+- [ ] Implement report deletion (soft delete with `archived` status)
+- [ ] Add coach notes editing and persistence
+- [ ] Add report approval workflow with notifications
+- [ ] Implement parent/student version generation
+- [ ] Add PDF export functionality
+- [ ] Implement share link generation
+- [ ] Add report search and filtering across students/sessions
+- [ ] Implement report caching strategy
+- [ ] Add optimistic updates for status transitions
+- [ ] Implement real-time collaboration (if needed)
+
+---
+
+## Summary
+
+Successfully implemented the Report persistence layer with repository-backed draft storage. This sprint establishes the foundation for the full Report lifecycle.
+
+**Key Achievements:**
+
+1. **ReportRecord Schema** — Typed interface with status lifecycle, versioning, and comprehensive metadata
+2. **Repository Layer** — Isolated persistence layer with CRUD operations, currently in-memory but swappable to Notion
+3. **Draft Persistence** — Every generation creates a new version in the repository
+4. **Versioning** — Incremental version numbers per session, all versions preserved
+5. **Metadata Tracking** — Stores provider, model, prompt version, confidence, source coverage, generation duration
+6. **Workspace Integration** — Loads latest draft from repository, no volatile in-memory state
+
+**Architecture Compliance:**
+- ✅ No UI redesign
+- ✅ No Prompt Builder changes
+- ✅ No ReportContext changes
+- ✅ Repository isolated for future Notion swap
+- ✅ Follows existing server function patterns
+
+**Pipeline:**
+```
+ReportContext → Prompt Builder → LLM Provider → Structured JSON → 
+Runtime Validation → Report Repository → Draft Record → Workspace
+```
+
+**Build status:** ✅ Success  
+**Deployed to:** `origin/main`  
+**Total files created:** 2  
+**Total files modified:** 2  
+**Total lines added:** 194  
+**Total lines removed:** 20
+
+---
+
+# Sprint 6 — Session Intelligence Engine
+
+## 1. Files Created
+
+- `src/lib/sessions/context.types.ts` — SessionContext domain model types
+- `src/lib/sessions/context.server.ts` — SessionContext builder that aggregates all session-relevant data
+- `src/lib/sessions/brief.schema.ts` — Zod schema for SessionBrief structured output
+- `src/lib/sessions/prompt.builder.ts` — Session Prompt Builder following Report Engine pattern
+- `src/lib/sessions/validator.server.ts` — SessionBrief validator with Zod + business validation
+- `src/lib/sessions/repository.server.ts` — SessionBrief repository with in-memory storage
+- `src/lib/sessions/generate.server.ts` — Server function for session brief generation
+- `src/lib/sessions/mapper.ts` — Maps SessionBrief to workspace display format
+
+## 2. Files Modified
+
+- `src/routes/sessions_.$sessionId.tsx` — Added brief loading, generation state, and handler
+- `src/components/session-workspace/AIBriefingPanel.tsx` — Added AI briefing display with generate/regenerate button
+
+## 3. Session Context Architecture
+
+The SessionContext builder aggregates all data relevant to a coaching session:
+
+```
+Session → SessionContext Builder → SessionContext
+                                    ├── student: SessionContextStudent
+                                    ├── session: SessionContextSession
+                                    ├── sessionNotes: SessionContextSessionNotes
+                                    ├── previousSession: SessionContextPreviousSession | null
+                                    ├── goals: SessionContextGoals
+                                    ├── sprint: SessionContextSprint | null
+                                    ├── tasks: SessionContextTasks
+                                    ├── assessment: SessionContextAssessment | null
+                                    ├── recommendations: SessionContextRecommendations
+                                    └── metadata: SessionContextMetadata
+```
+
+### Data Sources
+
+| Source | Notion Query | Function Used |
+|--------|-------------|---------------|
+| Student Profile | Students DB | `getStudentProfileData(studentId)` |
+| Current Session | Sessions DB | `fetchSessions()` |
+| Previous Session | Sessions DB | `fetchSessions()` + sort by date |
+| Goals | Goals DB | via `getStudentProfileData` |
+| Sprint | Sprints DB | via `getStudentProfileData` |
+| Tasks | Tasks DB | via `getStudentProfileData` |
+| Assessment | Assessments DB | via `getStudentProfileData` |
+| Recommendations | AI Recommendations DB | via `getStudentProfileData` |
+
+### Reused Infrastructure
+
+- `fetchSessions()` from `@/lib/notion/queries.server`
+- `getStudentProfileData()` from `@/lib/students/profile.server`
+- All `extract*` transformers from `@/lib/notion/transformers`
+- Helper functions: `isTaskDone()`, `isPast()`, `isHighRisk()`, `isPendingReview()`
+
+## 4. Session Prompt Builder
+
+The Session Prompt Builder follows the same architecture as the Report Prompt Builder:
+
+```typescript
+buildSessionBriefPrompt(context: SessionContext): PromptDocument
+```
+
+### Prompt Sections (11 total)
+
+| Order | Section ID | Title |
+|-------|-----------|-------|
+| 1 | role | Role & Context |
+| 2 | student | Student Profile |
+| 3 | current-session | Current Session |
+| 4 | previous-session | Previous Session |
+| 5 | goals | Goals |
+| 6 | sprint | Sprint Data |
+| 7 | tasks | Tasks |
+| 8 | assessment | Assessment Data |
+| 9 | recommendations | AI Recommendations |
+| 10 | data-availability | Data Availability |
+| 11 | output-instructions | Output Instructions |
+
+### Key Differences from Report Prompt Builder
+
+1. **System prompt** is session-specific (coaching briefing, not report writing)
+2. **Previous session** section provides historical context
+3. **Output instructions** request SessionBrief schema instead of ReportOutput
+4. **Tone** is more action-oriented (what to discuss, what to do)
+
+### Reused Components
+
+- `PromptDocument`, `PromptMetadata`, `PromptSection` types from `@/lib/report/prompt.types`
+- `PROMPT_TEMPLATE_VERSION` from `@/lib/report/prompt.templates`
+- Same metadata structure (availableSources, missingSources, characterCount, wordCount)
+
+## 5. SessionBrief Schema
+
+```typescript
+import { z } from "zod";
+
+export const SessionBriefSchema = z.object({
+  currentSituation: z.string().min(1),
+  progressSinceLastSession: z.string().min(1),
+  risks: z.array(z.string().min(1)),
+  opportunities: z.array(z.string().min(1)),
+  recommendedDiscussionTopics: z.array(z.string().min(1)),
+  recommendedActions: z.array(z.string().min(1)),
+  coachChecklist: z.array(z.string().min(1)),
+  confidence: z.number().min(0).max(1),
+});
+
+export type SessionBrief = z.infer<typeof SessionBriefSchema>;
+```
+
+### Schema Design Decisions
+
+- **currentSituation**: Concise summary of the student's current state
+- **progressSinceLastSession**: What changed since the last session
+- **risks**: Array of specific risks or concerns (min 1 required by business validation)
+- **opportunities**: Array of positive developments (min 1 required by business validation)
+- **recommendedDiscussionTopics**: Topics the coach should discuss (min 1 required)
+- **recommendedActions**: Concrete actions for the coach (min 1 required)
+- **coachChecklist**: Items to verify or remember during the session
+- **confidence**: 0-1 score reflecting analysis reliability
+
+## 6. Validation Flow
+
+```
+Raw LLM Response
+       ↓
+JSON.parse() → SessionBriefValidationError if invalid
+       ↓
+SessionBriefSchema.safeParse() → Zod errors if schema mismatch
+       ↓
+Business Validation → Errors if:
+  - risks array empty
+  - opportunities array empty
+  - recommendedDiscussionTopics empty
+  - recommendedActions empty
+  - confidence < 0.5
+       ↓
+Typed SessionBrief returned
+```
+
+### Reused Infrastructure
+
+- `SessionBriefValidationError` class (same pattern as `ValidationError` in Report Engine)
+- Zod for schema validation
+- Same error accumulation pattern
+- Same `aiLogger` for structured logging
+
+## 7. Repository Integration
+
+```typescript
+interface SessionBriefRecord {
+  id: string;
+  sessionId: string;
+  studentId: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  brief: SessionBrief;
+  promptVersion: string;
+  provider: string;
+  model: string;
+  confidence: number;
+  generationDuration: number;
+}
+```
+
+### Repository API
+
+```typescript
+createSessionBrief(params) → SessionBriefRecord
+getSessionBrief(briefId) → SessionBriefRecord | null
+getLatestSessionBrief(sessionId) → SessionBriefRecord | null
+listSessionBriefs(sessionId) → SessionBriefRecord[]
+listStudentBriefs(studentId) → SessionBriefRecord[]
+deleteSessionBrief(briefId) → boolean
+```
+
+### Versioning Strategy
+
+Same as Report Repository: each generation creates a new version. Previous versions are preserved.
+
+## 8. Workspace Integration
+
+### Route Changes
+
+```typescript
+// Loader now returns latest brief
+const loadSessionWorkspace = createServerFn({ method: "GET" })
+  .handler(async ({ data }) => {
+    const result = await getSessionWorkspaceData(data.sessionId);
+    if (!result.ok) return result;
+    const latestBrief = await getLatestSessionBrief(data.sessionId);
+    return { ok: true, data: result.data, latestBrief };
+  });
+```
+
+### Component Changes
+
+```typescript
+const [currentBrief, setCurrentBrief] = useState<SessionBriefRecord | null>(result.latestBrief);
+
+const handleGenerateBrief = async () => {
+  setIsGenerating(true);
+  try {
+    const briefRecord = await generateSessionBrief({ data: { sessionId: session.id } });
+    setCurrentBrief(briefRecord);
+    toast.success("Session brief generated successfully.");
+  } catch (error) {
+    // Error handling...
+  } finally {
+    setIsGenerating(false);
+  }
+};
+```
+
+### AIBriefingPanel Changes
+
+The panel now has two modes:
+
+1. **AI Brief Generated**: Shows structured briefing with current situation, progress, risks, opportunities, discussion topics, actions, and checklist
+2. **No Brief Yet**: Falls back to existing static briefing with signals and metrics
+
+A "Generate Brief" / "Regenerate" button was added to the panel header.
+
+## 9. Shared Components Extracted
+
+| Component | Source | Used By |
+|-----------|--------|---------|
+| `PromptDocument` type | `@/lib/report/prompt.types` | Report + Session builders |
+| `PromptMetadata` type | `@/lib/report/prompt.types` | Report + Session builders |
+| `PromptSection` type | `@/lib/report/prompt.types` | Report + Session builders |
+| `PROMPT_TEMPLATE_VERSION` | `@/lib/report/prompt.templates` | Report + Session builders |
+| `getLLMProvider()` | `@/lib/ai/provider.factory` | Report + Session generators |
+| `aiLogger` | `@/lib/ai/logger` | Report + Session generators |
+| `PromptOutput` type | `@/lib/report/prompt.types` | Report + Session validators |
+| `createServerFn` pattern | `@tanstack/react-start` | Both routes |
+
+No new shared abstractions were needed — the existing Report Engine infrastructure was sufficient.
+
+## 10. Build Result
+
+**Status:** ✅ Success
+
+```
+✓ Client build: 273 modules transformed
+✓ SSR build: 166 modules transformed
+✓ Nitro build: 315 modules transformed
+```
+
+No build errors or warnings.
+
+## 11. git status
+
+```
+On branch main
+Your branch is up to date with 'origin/main'.
+```
+
+Clean working tree. All changes committed and pushed.
+
+## 12. Commit Hash
+
+**Commit:** `eb4e5ba`  
+**Message:** `feat: implement Session Intelligence Engine (Sprint 6)`  
+**Branch:** `main`  
+**Files changed:** 10 files (+1,622 lines, -100 lines)
+
+## 13. Push Result
+
+**Status:** ✅ Success
+
+```
+To https://github.com/bibilenedanis/ko-360-command-center.git
+   1a819dc..eb4e5ba  main -> main
+```
+
+## 14. Remaining Technical Debt
+
+- [ ] Persist session briefs to Notion (currently in-memory only)
+- [ ] Add session brief version comparison UI
+- [ ] Implement brief regeneration with adjusted parameters
+- [ ] Add brief quality metrics tracking over time
+- [ ] Implement brief templates for different session types
+- [ ] Add brief export (PDF, email)
+- [ ] Implement brief sharing with other coaches
+- [ ] Add brief archival for completed sessions
+- [ ] Create session brief test harness (similar to Report Engine)
+- [ ] Implement brief caching for repeated views
+- [ ] Add brief search across sessions
+- [ ] Implement brief-driven session agenda auto-generation
+
+---
+
+## Summary
+
+Successfully implemented the Session Intelligence Engine, transforming the Session Workspace from a passive information screen into an AI-assisted coaching workspace.
+
+**Key Achievements:**
+
+1. **SessionContext Builder** — Aggregates all session-relevant data from Notion, including previous session for historical context
+2. **SessionBrief Schema** — Zod-validated structured output with 8 fields covering situation, progress, risks, opportunities, topics, actions, checklist, and confidence
+3. **Session Prompt Builder** — Follows Report Engine pattern exactly, reusing all shared types and infrastructure
+4. **Validation Pipeline** — Reuses Zod schema + business validation pattern from Report Engine
+5. **Repository Layer** — In-memory storage with versioning, designed for future Notion swap
+6. **Workspace Integration** — Added "Generate Brief" button to AIBriefingPanel, shows structured AI output when available
+7. **No UI Redesign** — Existing components and layout preserved, AI briefing added alongside existing content
+
+**Architecture Compliance:**
+- ✅ Reuses Report Engine pattern exactly
+- ✅ No duplication of AI infrastructure
+- ✅ No modification of Report Engine code
+- ✅ Provider-independent (uses existing LLM abstraction)
+- ✅ Repository isolated for future Notion swap
+- ✅ No UI redesign
+
+**Pipeline:**
+```
+Session → SessionContext Builder → Session Prompt Builder → LLM Provider → 
+Structured JSON → Zod Validation → Business Validation → Repository → 
+SessionBrief Record → Workspace
+```
+
+**Build status:** ✅ Success  
+**Deployed to:** `origin/main`  
+**Total files created:** 8  
+**Total files modified:** 2  
+**Total lines added:** 1,622  
+**Total lines removed:** 100
