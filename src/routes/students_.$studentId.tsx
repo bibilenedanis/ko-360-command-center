@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/app-shell/AppShell";
 import { StudentHeader } from "@/components/student-360/StudentHeader";
 import { StudentBrief } from "@/components/student-360/StudentBrief";
@@ -14,9 +15,20 @@ import {
   type StudentProfileData,
 } from "@/lib/students/profile.server";
 
+const loadStudentProfile = createServerFn({ method: "GET" })
+  .validator((data: unknown) => {
+    if (!data || typeof data !== "object" || !("studentId" in data) || typeof data.studentId !== "string") {
+      throw new Error("Invalid studentId");
+    }
+    return data as { studentId: string };
+  })
+  .handler(async ({ data }) => {
+    return await getStudentProfileData(data.studentId);
+  });
+
 export const Route = createFileRoute("/students_/$studentId")({
   loader: async ({ params }) => {
-    return await getStudentProfileData(params.studentId);
+    return await loadStudentProfile({ data: { studentId: params.studentId } });
   },
   head: () => ({
     meta: [
